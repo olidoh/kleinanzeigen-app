@@ -29,12 +29,22 @@ enum class AiProvider(
         hint = "Das Modell muss Bilder verstehen, z. B. mistral-medium-2508 oder mistral-small-2506.",
     ),
     LANGDOCK(
-        label = "Langdock",
+        label = "Langdock (GPT-Modelle)",
         kind = Kind.OPENAI_COMPATIBLE,
         defaultBaseUrl = "https://api.langdock.com/openai/eu/v1",
         defaultModel = "gpt-5-mini",
         keyUrl = "https://app.langdock.com",
-        hint = "Welche Modelle verfügbar sind, legt euer Langdock-Workspace fest. Das Modell muss Bilder verstehen.",
+        hint = "Über diesen Zugang bietet Langdock OpenAI-Modelle an (z. B. gpt-5-mini), so wie sie euer " +
+            "Workspace freigibt. Mistral-Modelle bietet Langdock derzeit nicht über die API an.",
+    ),
+    LANGDOCK_CLAUDE(
+        label = "Langdock (Claude-Modelle)",
+        kind = Kind.CLAUDE,
+        defaultBaseUrl = "https://api.langdock.com/anthropic/eu",
+        defaultModel = "claude-sonnet-4-6-default",
+        keyUrl = "https://app.langdock.com",
+        hint = "Claude-Modelle über euren Langdock-Workspace, z. B. claude-sonnet-4-6-default. " +
+            "Derselbe Langdock-Schlüssel wie bei den GPT-Modellen.",
     ),
     OPENAI(
         label = "OpenAI",
@@ -55,6 +65,9 @@ enum class AiProvider(
     ;
 
     enum class Kind { CLAUDE, OPENAI_COMPATIBLE }
+
+    /** Nur beim eigenen Anbieter ist die Adresse frei einstellbar, sonst gilt die feste Vorgabe. */
+    val hasEditableBaseUrl: Boolean get() = this == CUSTOM
 }
 
 /** Alles, was für eine Anfrage an einen Anbieter nötig ist. */

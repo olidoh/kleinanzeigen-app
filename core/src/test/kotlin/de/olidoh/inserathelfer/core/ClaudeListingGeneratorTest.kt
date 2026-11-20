@@ -66,4 +66,25 @@ class ClaudeListingGeneratorTest {
         assertTrue(body.contains("Kratzer an der Seite"))
         assertEquals(listOf("server-side-fallback-2026-07-01"), params._headers().values("anthropic-beta"))
     }
+
+    @Test
+    fun `via Langdock no schema, effort or fallback is sent`() {
+        val generator = ClaudeListingGenerator(
+            AnthropicOkHttpClient.builder().apiKey("test").baseUrl("https://api.langdock.com/anthropic/eu").build(),
+            model = "claude-sonnet-4-6-default",
+            viaAnthropic = false,
+        )
+        val params = generator.buildParams(listOf(byteArrayOf(1)), "")
+        val body = jsonMapper().writeValueAsString(params._body())
+        assertTrue(!body.contains("output_config"))
+        assertTrue(!body.contains("fallbacks"))
+        assertTrue(body.contains("Antworte ausschließlich mit einem JSON-Objekt"))
+        assertEquals(emptyList(), params._headers().values("anthropic-beta"))
+    }
+
+    @Test
+    fun `factory routes Langdock Claude through the Anthropic SDK`() {
+        val g = ListingGenerator.create(AiConfig(AiProvider.LANGDOCK_CLAUDE, "k"))
+        assertTrue(g is ClaudeListingGenerator)
+    }
 }

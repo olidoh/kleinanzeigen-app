@@ -6,7 +6,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -43,7 +46,7 @@ import de.olidoh.inserathelfer.ListingViewModel
 import de.olidoh.inserathelfer.Screen
 import de.olidoh.inserathelfer.core.AiProvider
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(vm: ListingViewModel) {
     val context = LocalContext.current
@@ -57,7 +60,7 @@ fun SettingsScreen(vm: ListingViewModel) {
     val isCustom = provider == AiProvider.CUSTOM
     val canSave = (storedKey != null || keyInput.isNotBlank()) &&
         model.isNotBlank() &&
-        (provider.kind == AiProvider.Kind.CLAUDE || baseUrl.startsWith("https://"))
+        (!provider.hasEditableBaseUrl || baseUrl.trim().startsWith("https://"))
 
     Scaffold(
         topBar = {
@@ -77,6 +80,8 @@ fun SettingsScreen(vm: ListingViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .consumeWindowInsets(padding)
+                .imePadding()
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -137,7 +142,7 @@ fun SettingsScreen(vm: ListingViewModel) {
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            if (provider.kind == AiProvider.Kind.OPENAI_COMPATIBLE) {
+            if (provider.hasEditableBaseUrl) {
                 OutlinedTextField(
                     value = baseUrl,
                     onValueChange = { baseUrl = it },

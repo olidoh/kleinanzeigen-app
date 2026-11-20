@@ -23,7 +23,8 @@ class AiSettings(context: Context) {
         prefs.getString("${provider.name}_model", null) ?: provider.defaultModel
 
     fun baseUrl(provider: AiProvider): String =
-        prefs.getString("${provider.name}_base_url", null) ?: provider.defaultBaseUrl
+        if (!provider.hasEditableBaseUrl) provider.defaultBaseUrl
+        else prefs.getString("${provider.name}_base_url", null) ?: provider.defaultBaseUrl
 
     fun apiKey(provider: AiProvider): String? = keys.load(provider.name)
 
