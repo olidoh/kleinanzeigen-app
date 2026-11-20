@@ -9,6 +9,7 @@ import androidx.activity.viewModels
 import de.olidoh.inserathelfer.ui.AppTheme
 import de.olidoh.inserathelfer.ui.CaptureScreen
 import de.olidoh.inserathelfer.ui.DetailsScreen
+import de.olidoh.inserathelfer.ui.PostScreen
 import de.olidoh.inserathelfer.ui.ReviewScreen
 import de.olidoh.inserathelfer.ui.SettingsScreen
 
@@ -32,6 +33,10 @@ class MainActivity : ComponentActivity() {
                     Screen.REVIEW -> {
                         BackHandler { vm.screen = Screen.DETAILS }
                         ReviewScreen(vm)
+                    }
+                    Screen.POST -> {
+                        BackHandler { vm.screen = Screen.REVIEW }
+                        PostScreen(vm)
                     }
                 }
             }

@@ -124,6 +124,11 @@ fun ReviewScreen(vm: ListingViewModel) {
             }
 
             Button(
+                onClick = { vm.screen = Screen.POST },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Direkt bei Kleinanzeigen einstellen") }
+
+            OutlinedButton(
                 onClick = {
                     val result = KleinanzeigenHandoff.handOff(context, vm.photos.toList(), draft.title, draft.asShareText())
                     val hint = when (result) {
@@ -137,7 +142,7 @@ fun ReviewScreen(vm: ListingViewModel) {
                     Toast.makeText(context, hint, Toast.LENGTH_LONG).show()
                 },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("An Kleinanzeigen übergeben") }
+            ) { Text("An die Kleinanzeigen-App übergeben") }
 
             OutlinedButton(onClick = vm::startOver, modifier = Modifier.fillMaxWidth()) {
                 Text("Neue Anzeige beginnen")

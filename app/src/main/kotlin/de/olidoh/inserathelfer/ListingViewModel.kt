@@ -20,7 +20,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-enum class Screen { SETTINGS, CAPTURE, DETAILS, REVIEW }
+enum class Screen { SETTINGS, CAPTURE, DETAILS, REVIEW, POST }
 
 class ListingViewModel(app: Application) : AndroidViewModel(app) {
 
