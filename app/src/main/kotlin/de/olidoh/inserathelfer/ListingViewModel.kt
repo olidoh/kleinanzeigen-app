@@ -8,10 +8,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import de.olidoh.inserathelfer.core.AiConfig
+import de.olidoh.inserathelfer.core.AiProvider
 import de.olidoh.inserathelfer.core.ListingDraft
 import de.olidoh.inserathelfer.core.ListingException
 import de.olidoh.inserathelfer.core.ListingGenerator
-import de.olidoh.inserathelfer.data.ApiKeyStore
+import de.olidoh.inserathelfer.data.AiSettings
 import de.olidoh.inserathelfer.image.ImagePreparer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -22,12 +24,13 @@ enum class Screen { SETTINGS, CAPTURE, DETAILS, REVIEW }
 
 class ListingViewModel(app: Application) : AndroidViewModel(app) {
 
-    private val keyStore = ApiKeyStore(app)
+    val settings = AiSettings(app)
 
-    var apiKey by mutableStateOf(keyStore.load())
+    /** Konfiguration des gewählten Anbieters; null, solange kein Schlüssel hinterlegt ist. */
+    var aiConfig by mutableStateOf<AiConfig?>(settings.currentConfig())
         private set
 
-    var screen by mutableStateOf(if (apiKey == null) Screen.SETTINGS else Screen.CAPTURE)
+    var screen by mutableStateOf(if (aiConfig == null) Screen.SETTINGS else Screen.CAPTURE)
 
     val photos = mutableStateListOf<File>()
     var sellerNotes by mutableStateOf("")
@@ -36,15 +39,16 @@ class ListingViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var error by mutableStateOf<String?>(null)
 
-    fun saveApiKey(key: String) {
-        keyStore.save(key)
-        apiKey = key.trim()
-        screen = Screen.CAPTURE
+    /** Speichert die Einstellungen eines Anbieters und macht ihn zum aktiven. Leerer Schlüssel: alten behalten. */
+    fun saveProvider(provider: AiProvider, apiKey: String, model: String, baseUrl: String) {
+        settings.save(provider, apiKey.ifBlank { null }, model, baseUrl)
+        aiConfig = settings.currentConfig()
+        if (aiConfig != null) screen = Screen.CAPTURE
     }
 
-    fun removeApiKey() {
-        keyStore.clear()
-        apiKey = null
+    fun removeKey(provider: AiProvider) {
+        settings.removeKey(provider)
+        aiConfig = settings.currentConfig()
     }
 
     fun addPhoto(file: File) {
@@ -66,7 +70,7 @@ class ListingViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun generate() {
-        val key = apiKey ?: run {
+        val config = aiConfig ?: run {
             screen = Screen.SETTINGS
             return
         }
@@ -79,7 +83,7 @@ class ListingViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 draft = withContext(Dispatchers.IO) {
                     val jpegs = images.take(ListingGenerator.MAX_IMAGES).map(ImagePreparer::jpegForAi)
-                    ListingGenerator(key).generate(jpegs, notes)
+                    ListingGenerator.create(config).generate(jpegs, notes)
                 }
                 screen = Screen.REVIEW
             } catch (e: ListingException) {

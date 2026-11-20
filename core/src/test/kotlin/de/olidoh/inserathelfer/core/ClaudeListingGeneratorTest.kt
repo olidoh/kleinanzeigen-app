@@ -7,11 +7,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-class ListingGeneratorTest {
+class ClaudeListingGeneratorTest {
 
     @Test
     fun `parses a complete answer`() {
-        val draft = ListingGenerator.parseDraftJson(
+        val draft = ListingPrompt.parseDraftJson(
             """
             {"title":"IKEA Poäng Sessel Birke, Bezug beige","description":"Gut erhaltener Sessel.",
              "priceEur":35,"priceType":"NEGOTIABLE","category":"Haus & Garten > Wohnzimmer",
@@ -28,7 +28,7 @@ class ListingGeneratorTest {
     @Test
     fun `clamps long titles at a word boundary`() {
         val longTitle = "Samsung Galaxy S23 Ultra 256 GB Phantom Black mit Originalverpackung und Ladekabel"
-        val draft = ListingGenerator.parseDraftJson(
+        val draft = ListingPrompt.parseDraftJson(
             """{"title":"$longTitle","description":"x","priceEur":500,"priceType":"FIXED",
                "category":"Elektronik > Handy & Telefon","condition":"Sehr gut","priceReasoning":"x"}""",
         )
@@ -39,7 +39,7 @@ class ListingGeneratorTest {
 
     @Test
     fun `free items have price zero and unknown values fall back`() {
-        val draft = ListingGenerator.parseDraftJson(
+        val draft = ListingPrompt.parseDraftJson(
             """{"title":"Umzugskartons","description":"x","priceEur":12,"priceType":"FREE",
                "category":"Haus & Garten","condition":"Wie neu","priceReasoning":"x"}""",
         )
@@ -50,13 +50,13 @@ class ListingGeneratorTest {
 
     @Test
     fun `invalid json gives a readable error`() {
-        val e = assertFailsWith<ListingException> { ListingGenerator.parseDraftJson("kein json") }
+        val e = assertFailsWith<ListingException> { ListingPrompt.parseDraftJson("kein json") }
         assertTrue(e.message!!.contains("nicht gelesen"))
     }
 
     @Test
     fun `request contains images, schema and fallback`() {
-        val generator = ListingGenerator(AnthropicOkHttpClient.builder().apiKey("test").build())
+        val generator = ClaudeListingGenerator(AnthropicOkHttpClient.builder().apiKey("test").build())
         val params = generator.buildParams(List(7) { byteArrayOf(1, 2, 3) }, "Kratzer an der Seite")
         val body = jsonMapper().writeValueAsString(params._body())
         assertEquals(ListingGenerator.MAX_IMAGES, Regex("\"type\":\"image\"").findAll(body).count())

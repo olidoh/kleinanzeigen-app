@@ -11,7 +11,7 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /**
- * Speichert den Claude-API-Schlüssel des Nutzers verschlüsselt.
+ * Speichert die API-Schlüssel des Nutzers verschlüsselt, einen je KI-Anbieter.
  *
  * Der AES-Schlüssel liegt im Android Keystore und verlässt das Gerät nie; in den
  * SharedPreferences steht nur der verschlüsselte Text. Ohne diesen Keystore-Eintrag
@@ -21,8 +21,8 @@ class ApiKeyStore(context: Context) {
 
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    fun load(): String? {
-        val stored = prefs.getString(KEY_API, null) ?: return null
+    fun load(provider: String): String? {
+        val stored = prefs.getString(prefKey(provider), null) ?: return null
         return runCatching {
             val (ivPart, dataPart) = stored.split(":", limit = 2)
             val cipher = Cipher.getInstance(TRANSFORMATION)
@@ -34,23 +34,26 @@ class ApiKeyStore(context: Context) {
             String(cipher.doFinal(Base64.decode(dataPart, Base64.NO_WRAP)), Charsets.UTF_8)
         }.getOrElse {
             // Nicht mehr entschlüsselbar: verwerfen, der Nutzer gibt den Schlüssel neu ein.
-            clear()
+            clear(provider)
             null
         }
     }
 
-    fun save(apiKey: String) {
+    fun save(provider: String, apiKey: String) {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, secretKey())
         val encrypted = cipher.doFinal(apiKey.trim().toByteArray(Charsets.UTF_8))
         val value = Base64.encodeToString(cipher.iv, Base64.NO_WRAP) + ":" +
             Base64.encodeToString(encrypted, Base64.NO_WRAP)
-        prefs.edit().putString(KEY_API, value).apply()
+        prefs.edit().putString(prefKey(provider), value).apply()
     }
 
-    fun clear() {
-        prefs.edit().remove(KEY_API).apply()
+    fun clear(provider: String) {
+        prefs.edit().remove(prefKey(provider)).apply()
     }
+
+    /** Ältere Versionen hatten nur einen Claude-Schlüssel unter "claude_api_key_encrypted". */
+    private fun prefKey(provider: String) = "${provider.lowercase()}_api_key_encrypted"
 
     private fun secretKey(): SecretKey {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
@@ -71,9 +74,8 @@ class ApiKeyStore(context: Context) {
 
     private companion object {
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
-        const val KEY_ALIAS = "claude_api_key"
+        const val KEY_ALIAS = "claude_api_key" // Alias bleibt, damit gespeicherte Schlüssel lesbar bleiben
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val PREFS = "secure_settings"
-        const val KEY_API = "claude_api_key_encrypted"
     }
 }
