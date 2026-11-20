@@ -19,7 +19,7 @@ interface ListingGenerator {
         const val MAX_IMAGES = 5
 
         fun create(config: AiConfig): ListingGenerator = when (config.provider.kind) {
-            AiProvider.Kind.CLAUDE -> ClaudeListingGenerator(config.apiKey, config.model)
+            AiProvider.Kind.CLAUDE -> ClaudeListingGenerator(config.apiKey, config.model, config.baseUrl)
             AiProvider.Kind.OPENAI_COMPATIBLE -> OpenAiCompatibleListingGenerator(config)
         }
     }

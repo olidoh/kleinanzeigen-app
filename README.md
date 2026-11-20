@@ -25,11 +25,12 @@ Jeder Nutzer wählt in den Einstellungen einen Anbieter und trägt seinen eigene
 |---|---|---|
 | Claude (Anthropic) | offizielles Anthropic-SDK, festes Antwortschema | `claude-opus-5-5` |
 | Mistral | `https://api.mistral.ai/v1/chat/completions` | `mistral-medium-2508` |
-| Langdock | `https://api.langdock.com/openai/eu/v1/chat/completions` | `gpt-5-mini` (je nach Workspace) |
+| Langdock (GPT-Modelle) | `https://api.langdock.com/openai/eu/v1/chat/completions` | `gpt-5-mini` (je nach Workspace) |
+| Langdock (Claude-Modelle) | `https://api.langdock.com/anthropic/eu/v1/messages` über das Anthropic-SDK | `claude-sonnet-4-6-default` |
 | OpenAI | `https://api.openai.com/v1/chat/completions` | `gpt-4o` |
 | Anderer Anbieter | jede OpenAI-kompatible Basis-URL | frei wählbar |
 
-Modell und Basis-URL lassen sich je Anbieter ändern; das Modell muss Bilder verstehen.
+Das Modell lässt sich je Anbieter ändern und muss Bilder verstehen; die Adresse ist nur beim eigenen Anbieter frei einstellbar. Mistral-Modelle bietet Langdock derzeit nicht über die API an, dafür direkt den Anbieter Mistral nutzen.
 Die Schlüssel werden je Anbieter mit einem AES-Schlüssel aus dem Android Keystore verschlüsselt
 gespeichert, nicht gesichert und nur an den jeweiligen Anbieter gesendet. Es gibt keinen eigenen Server.
 Pro Anfrage gehen höchstens 5 Fotos mit, auf 1568 px verkleinert.
