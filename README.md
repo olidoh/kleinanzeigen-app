@@ -8,6 +8,19 @@ Android-App, die aus ein paar Fotos eine fertige Kleinanzeige macht:
 4. Alles prüfen und bearbeiten, dann „An Kleinanzeigen übergeben“: Der Text landet in der
    Zwischenablage, die Fotos gehen per Teilen an die offizielle Kleinanzeigen-App.
 
+## Stil und Tonalität
+
+In den Einstellungen lässt sich eine eigene Vorgabe hinterlegen, etwa „Schreibe immer in der Du-Form,
+keine Emojis“. Sie wird dauerhaft gespeichert und bei jeder KI-Erstellung mitgeschickt, unabhängig vom Anbieter.
+
+## Meine Anzeigen
+
+Jede erstellte Anzeige wird mit Fotos und Text auf dem Handy gespeichert (App-Speicher,
+`files/listings/<id>/`, ohne Cloud). Über das Verlauf-Symbol auf dem Kamera-Bildschirm lassen sich
+die letzten Anzeigen ansehen, weiter bearbeiten, später veröffentlichen oder löschen. Änderungen werden
+sofort gesichert. Erreicht der WebView nach dem Aufgeben die Bestätigungsseite, wird die Anzeige als
+veröffentlicht markiert; per Schalter in der Prüfansicht lässt sich das auch von Hand setzen.
+
 ## Warum Übergabe statt Automatik
 
 Kleinanzeigen bietet Privatnutzern keine Schnittstelle zum Aufgeben von Anzeigen. Automatisches

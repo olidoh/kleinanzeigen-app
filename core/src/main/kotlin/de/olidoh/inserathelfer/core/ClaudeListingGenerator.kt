@@ -40,10 +40,10 @@ class ClaudeListingGenerator(
         viaAnthropic = baseUrl.trim().trimEnd('/').ifEmpty { ANTHROPIC_BASE_URL } == ANTHROPIC_BASE_URL,
     )
 
-    override fun generate(jpegImages: List<ByteArray>, sellerNotes: String): ListingDraft {
+    override fun generate(jpegImages: List<ByteArray>, sellerNotes: String, styleGuide: String): ListingDraft {
         require(jpegImages.isNotEmpty()) { "Mindestens ein Foto wird benötigt." }
         val message = try {
-            client.messages().create(buildParams(jpegImages, sellerNotes))
+            client.messages().create(buildParams(jpegImages, sellerNotes, styleGuide))
         } catch (e: UnauthorizedException) {
             throw ListingException("Der API-Schlüssel ist ungültig. Bitte in den Einstellungen prüfen.", e)
         } catch (e: PermissionDeniedException) {
@@ -62,7 +62,7 @@ class ClaudeListingGenerator(
         return parseMessage(message)
     }
 
-    internal fun buildParams(jpegImages: List<ByteArray>, sellerNotes: String): MessageCreateParams {
+    internal fun buildParams(jpegImages: List<ByteArray>, sellerNotes: String, styleGuide: String = ""): MessageCreateParams {
         val content = buildList {
             jpegImages.take(ListingGenerator.MAX_IMAGES).forEach { bytes ->
                 add(
@@ -74,7 +74,7 @@ class ClaudeListingGenerator(
                     ),
                 )
             }
-            add(ContentBlockParam.ofText(ListingPrompt.userPrompt(sellerNotes)))
+            add(ContentBlockParam.ofText(ListingPrompt.userPrompt(sellerNotes, styleGuide)))
         }
         val builder = MessageCreateParams.builder()
             .model(model)

@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
@@ -85,6 +86,9 @@ fun CaptureScreen(vm: ListingViewModel) {
             TopAppBar(
                 title = { Text("Fotos aufnehmen") },
                 actions = {
+                    IconButton(onClick = vm::showHistory) {
+                        Icon(Icons.Filled.History, contentDescription = "Meine Anzeigen")
+                    }
                     IconButton(onClick = {
                         galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }) { Icon(Icons.Filled.PhotoLibrary, contentDescription = "Aus Galerie wählen") }

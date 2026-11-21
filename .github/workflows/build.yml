@@ -16,9 +16,21 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v6
+      - name: Signierschlüssel bereitstellen
+        env:
+          KEYSTORE_B64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/inserathelfer.jks"
+            echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/inserathelfer.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::Kein Secret SIGNING_KEYSTORE_BASE64: APK wird mit wechselndem Debug-Schlüssel signiert und lässt sich nicht drüber installieren."
+          fi
       - name: Tests und Debug-APK bauen
+        env:
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
         run: ./gradlew --no-daemon :core:test :app:assembleDebug
       - uses: actions/upload-artifact@v7
         with:
-          name: inserat-helfer-debug-apk
+          name: inserat-helfer-${{ github.run_number }}-apk
           path: app/build/outputs/apk/debug/*.apk

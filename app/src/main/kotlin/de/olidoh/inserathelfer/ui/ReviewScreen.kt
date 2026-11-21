@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,9 +26,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
@@ -55,7 +58,7 @@ fun ReviewScreen(vm: ListingViewModel) {
             TopAppBar(
                 title = { Text("Anzeige prüfen") },
                 navigationIcon = {
-                    IconButton(onClick = { vm.screen = Screen.DETAILS }) {
+                    IconButton(onClick = vm::leaveReview) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
                     }
                 },
@@ -127,7 +130,25 @@ fun ReviewScreen(vm: ListingViewModel) {
                 }
             }
 
+            vm.current?.let { saved ->
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Bei Kleinanzeigen veröffentlicht", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "Gespeichert unter „Meine Anzeigen“. Du kannst sie auch später einstellen.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Switch(checked = saved.isPublished, onCheckedChange = vm::setPublished)
+                }
+            }
+
             Button(
+                onClick = { vm.screen = Screen.POST },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Direkt bei Kleinanzeigen einstellen") }
+
+            OutlinedButton(
                 onClick = {
                     val result = KleinanzeigenHandoff.handOff(context, vm.photos.toList(), draft.title, draft.asShareText())
                     val hint = when (result) {
@@ -141,7 +162,7 @@ fun ReviewScreen(vm: ListingViewModel) {
                     Toast.makeText(context, hint, Toast.LENGTH_LONG).show()
                 },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("An Kleinanzeigen übergeben") }
+            ) { Text("An die Kleinanzeigen-App übergeben") }
 
             OutlinedButton(onClick = vm::startOver, modifier = Modifier.fillMaxWidth()) {
                 Text("Neue Anzeige beginnen")

@@ -3,6 +3,12 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Fester Signierschlüssel aus der CI (GitHub-Secret), damit neue Versionen sich drüber installieren lassen.
+// Ohne Secret wird wie bisher mit dem zufälligen Debug-Schlüssel des Build-Rechners signiert.
+val signingPassword: String? = System.getenv("SIGNING_PASSWORD")?.takeIf { it.isNotBlank() }
+val sharedKeystore = System.getenv("SIGNING_KEYSTORE_PATH")?.let { file(it) }?.takeIf { it.isFile && signingPassword != null }
+val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+
 android {
     namespace = "de.olidoh.inserathelfer"
     compileSdk = 36
@@ -12,11 +18,26 @@ android {
         // Android 10+: Fotos lassen sich ohne Speicher-Berechtigung in die Galerie legen.
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        // Jeder CI-Lauf zählt hoch, damit Android die neue APK als Update annimmt.
+        versionCode = buildNumber
+        versionName = "0.1.$buildNumber"
+    }
+
+    signingConfigs {
+        if (sharedKeystore != null) {
+            create("shared") {
+                storeFile = sharedKeystore
+                storePassword = signingPassword
+                keyAlias = "inserathelfer"
+                keyPassword = signingPassword
+            }
+        }
     }
 
     buildTypes {
+        debug {
+            if (sharedKeystore != null) signingConfig = signingConfigs.getByName("shared")
+        }
         release {
             // Das Anthropic-SDK nutzt Reflection (Jackson); Minify erst mit passenden Regeln aktivieren.
             isMinifyEnabled = false

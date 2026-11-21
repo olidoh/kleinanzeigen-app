@@ -11,8 +11,9 @@ interface ListingGenerator {
     /**
      * @param jpegImages bereits verkleinerte JPEG-Bilder (lange Kante etwa 1568 px)
      * @param sellerNotes freie Hinweise des Verkäufers, z. B. Mängel oder Lieferumfang
+     * @param styleGuide dauerhafte Vorgabe zu Stil und Tonalität, z. B. „immer in der Du-Form“
      */
-    fun generate(jpegImages: List<ByteArray>, sellerNotes: String = ""): ListingDraft
+    fun generate(jpegImages: List<ByteArray>, sellerNotes: String = "", styleGuide: String = ""): ListingDraft
 
     companion object {
         /** Mehr Fotos verbessern das Ergebnis kaum, kosten aber mehr. */
@@ -73,10 +74,15 @@ object ListingPrompt {
         "priceReasoning" to mapOf("type" to "string", "description" to "Kurze Begründung des Preises"),
     )
 
-    fun userPrompt(sellerNotes: String): String {
+    fun userPrompt(sellerNotes: String, styleGuide: String = ""): String = buildString {
+        append("Erstelle eine Anzeige für den Artikel auf den Fotos.")
+        val style = styleGuide.trim()
+        if (style.isNotEmpty()) {
+            append("\n\nVorgaben des Verkäufers zu Stil und Tonalität (für Titel und Beschreibung immer einhalten):\n")
+            append(style)
+        }
         val notes = sellerNotes.trim()
-        val base = "Erstelle eine Anzeige für den Artikel auf den Fotos."
-        return if (notes.isEmpty()) base else "$base\n\nHinweise des Verkäufers:\n$notes"
+        if (notes.isNotEmpty()) append("\n\nHinweise des Verkäufers:\n").append(notes)
     }
 
     private val mapper = ObjectMapper()

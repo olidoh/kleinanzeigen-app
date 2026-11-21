@@ -32,17 +32,20 @@ object ImagePreparer {
     }
 
     /** Verkleinertes, richtig gedrehtes JPEG für die KI. */
-    fun jpegForAi(file: File): ByteArray {
+    fun jpegForAi(file: File): ByteArray = jpeg(file, MAX_EDGE_FOR_AI)
+
+    /** Richtig gedrehtes JPEG mit höchstens [maxEdge] Pixeln an der langen Kante. */
+    fun jpeg(file: File, maxEdge: Int): ByteArray {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.path, bounds)
         var sample = 1
-        while (max(bounds.outWidth, bounds.outHeight) / (sample * 2) >= MAX_EDGE_FOR_AI) sample *= 2
+        while (max(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxEdge) sample *= 2
 
         val decoded = BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample })
             ?: error("Foto ${file.name} konnte nicht gelesen werden.")
 
         val longEdge = max(decoded.width, decoded.height)
-        val scale = if (longEdge > MAX_EDGE_FOR_AI) MAX_EDGE_FOR_AI.toFloat() / longEdge else 1f
+        val scale = if (longEdge > maxEdge) maxEdge.toFloat() / longEdge else 1f
         val matrix = Matrix().apply {
             postScale(scale, scale)
             postRotate(rotationDegrees(file).toFloat())
