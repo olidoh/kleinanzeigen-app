@@ -3,6 +3,15 @@ package de.olidoh.inserathelfer.ui
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.webkit.CookieManager
+import android.widget.Toast
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.platform.LocalContext
+import de.olidoh.inserathelfer.share.KleinanzeigenHandoff
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -49,6 +58,9 @@ fun PostScreen(vm: ListingViewModel) {
     var progress by remember { mutableStateOf(0) }
     var status by remember { mutableStateOf("Kleinanzeigen wird geladen …") }
     var webView by remember { mutableStateOf<WebView?>(null) }
+    var unblockReport by remember { mutableStateOf<String?>(null) }
+    var showReport by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     val filler = remember(draft) { KleinanzeigenWebFiller(draft, vm.photos.toList()) }
 
     fun fill(view: WebView, auto: Boolean = false) {
@@ -66,7 +78,16 @@ fun PostScreen(vm: ListingViewModel) {
                     }
                 },
                 actions = {
-                    IconButton(onClick = { webView?.let { v -> KleinanzeigenWebFiller.unblock(v) { status = it } } }) {
+                    IconButton(onClick = {
+                        webView?.let { v ->
+                            status = "Seite wird geprüft …"
+                            KleinanzeigenWebFiller.unblock(v) { summary, details ->
+                                status = summary
+                                unblockReport = details
+                                showReport = true
+                            }
+                        }
+                    }) {
                         Icon(Icons.Filled.LockOpen, contentDescription = "Seite freigeben")
                     }
                     IconButton(onClick = { webView?.let { fill(it) } }) {
@@ -80,7 +101,10 @@ fun PostScreen(vm: ListingViewModel) {
             if (progress in 1..99) {
                 LinearProgressIndicator(progress = { progress / 100f }, modifier = Modifier.fillMaxWidth())
             }
-            Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
+            Surface(
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                modifier = Modifier.fillMaxWidth().clickable(enabled = unblockReport != null) { showReport = true },
+            ) {
                 Text(status, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(12.dp))
             }
             AndroidView(
@@ -129,6 +153,29 @@ fun PostScreen(vm: ListingViewModel) {
                     }
                 },
                 onRelease = { it.destroy() },
+            )
+        }
+    }
+
+    if (showReport) {
+        unblockReport?.let { report ->
+            AlertDialog(
+                onDismissRequest = { showReport = false },
+                title = { Text("Seiten-Prüfung") },
+                text = {
+                    Text(
+                        report,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState()),
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        KleinanzeigenHandoff.copyToClipboard(context, "Seiten-Prüfung", report)
+                        Toast.makeText(context, "Bericht kopiert", Toast.LENGTH_SHORT).show()
+                    }) { Text("Kopieren") }
+                },
+                dismissButton = { TextButton(onClick = { showReport = false }) { Text("Schließen") } },
             )
         }
     }

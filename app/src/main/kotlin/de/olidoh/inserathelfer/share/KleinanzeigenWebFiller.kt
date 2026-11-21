@@ -102,68 +102,152 @@ class KleinanzeigenWebFiller(
         /** Seite nach erfolgreichem Aufgeben (z. B. p-anzeige-aufgeben-bestaetigung.html). */
         fun isConfirmation(url: String) = url.contains("bestaetigung")
 
-        /** Notfall-Knopf: offene Auswahlfenster schließen und einen grauen Schleier entfernen. */
-        fun unblock(view: WebView, onResult: (String) -> Unit) {
-            view.evaluateJavascript("window.__ihUnblocked = null; ($UNBLOCK_SCRIPT)().then(n => window.__ihUnblocked = n);", null)
-            Handler(Looper.getMainLooper()).postDelayed({
-                view.evaluateJavascript("window.__ihUnblocked") { raw ->
-                    onResult(
-                        if (raw == null || raw == "null" || raw == "0") "Keine Sperre gefunden. Hilft das nicht, mit dem Pfeil zurück und die Seite neu öffnen."
-                        else "Seite freigegeben. Bitte die Auswahlfelder kurz prüfen.",
-                    )
-                }
-            }, 1800)
+        /**
+         * Notfall-Knopf: Sperren beseitigen und einen Bericht liefern, was über dem Formular lag.
+         * [onResult] bekommt eine kurze Meldung und den vollständigen Bericht zum Kopieren.
+         */
+        fun unblock(view: WebView, onResult: (summary: String, details: String) -> Unit) {
+            view.evaluateJavascript(
+                "window.__ihUnblocked = null; ($UNBLOCK_SCRIPT)().then(r => window.__ihUnblocked = r, " +
+                    "e => window.__ihUnblocked = { fixed: [], report: ['Skriptfehler: ' + e.message] });",
+                null,
+            )
+            pollUnblock(view, 0, onResult)
         }
+
+        private fun pollUnblock(view: WebView, attempts: Int, onResult: (String, String) -> Unit) {
+            view.evaluateJavascript("JSON.stringify(window.__ihUnblocked)") { raw ->
+                val obj = raw?.takeIf { it != "null" && it != "\"null\"" }
+                    ?.let { runCatching { JSONObject(JSONArray("[$it]").getString(0)) }.getOrNull() }
+                when {
+                    obj != null -> {
+                        val fixed = obj.optJSONArray("fixed").toStrings()
+                        val report = obj.optJSONArray("report").toStrings()
+                        val summary = if (fixed.isEmpty()) {
+                            "Auf der Seite liegt nichts über dem Formular. Details über das Schloss."
+                        } else {
+                            "Seite freigegeben (${fixed.size} Eingriff(e)). Bitte jetzt antippen."
+                        }
+                        val details = (listOf("Eingriffe:") + fixed.ifEmpty { listOf("keine") } + "" + "Befund:" + report)
+                            .joinToString("\n")
+                        onResult(summary, details)
+                    }
+                    attempts > 20 -> onResult("Freigabe antwortet nicht.", "Kein Ergebnis vom Seitenskript nach 10 s.")
+                    else -> Handler(Looper.getMainLooper()).postDelayed({ pollUnblock(view, attempts + 1, onResult) }, 500)
+                }
+            }
+        }
+
+        private fun JSONArray?.toStrings(): List<String> = this?.let { arr -> List(arr.length()) { arr.optString(it) } }.orEmpty()
 
         fun isLogin(url: String) = url.contains("login.kleinanzeigen.de") || url.contains("m-einloggen")
 
         /**
-         * Schließt offene Auswahlfenster und entfernt einen übrig gebliebenen grauen Schleier,
-         * der Klicks auf „Anzeige aufgeben“ blockiert. Ergebnis: Anzahl der Eingriffe.
+         * Schließt offene Auswahlfenster und beseitigt alles, was Taps auf das Formular abfängt.
+         * Statt zu raten, prüft das Skript per Treffer-Test (elementFromPoint), welches Element an der
+         * Stelle von Titel-Feld und Absende-Knopf wirklich oben liegt, und entfernt genau das:
+         * Overlays (auch iframes und Shadow-DOM), ::before/::after-Schleier, pointer-events:none,
+         * inert und Abdunkeln per opacity/filter. Ergebnis: { fixed: [...], report: [...] }.
          */
         val UNBLOCK_SCRIPT = """
             async function () {
               const sleep = (ms) => new Promise(r => setTimeout(r, ms));
               const norm = (s) => (s || '').trim().toLowerCase();
+              const fixed = [], report = [];
+              const desc = (el) => {
+                if (!el || !el.tagName) return String(el);
+                const cls = typeof el.className === 'string' ? el.className.trim().split(/\s+/).slice(0, 6).join('.') : '';
+                const cs = getComputedStyle(el), r = el.getBoundingClientRect();
+                return el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (cls ? '.' + cls : '') +
+                  ' [pos=' + cs.position + ' z=' + cs.zIndex + ' pe=' + cs.pointerEvents + ' op=' + cs.opacity +
+                  (cs.filter !== 'none' ? ' filter=' + cs.filter : '') + ' bg=' + cs.backgroundColor +
+                  ' ' + Math.round(r.width) + 'x' + Math.round(r.height) + (el.tagName === 'IFRAME' ? ' src=' + (el.src || '').slice(0, 80) : '') + ']';
+              };
               const visible = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
-                return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && cs.opacity !== '0'; };
+                return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
+              const hide = (el, why) => { fixed.push(why + ': ' + desc(el)); el.style.setProperty('display', 'none', 'important'); el.setAttribute('data-ih-hidden', '1'); };
               const esc = (t) => ['keydown', 'keyup'].forEach(type => (t || document).dispatchEvent(
                 new KeyboardEvent(type, { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true })));
-              let actions = 0;
-              const dialogs = () => Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"], dialog[open]')).filter(visible);
+              report.push('Seite: ' + location.pathname + ' Fenster: ' + innerWidth + 'x' + innerHeight + ' Scroll: ' + Math.round(scrollY));
+
+              // 1. Offene Dialoge regulär schließen
+              const dialogs = () => Array.from(document.querySelectorAll('[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open]')).filter(visible);
               for (let round = 0; round < 3 && dialogs().length; round++) {
                 for (const dlg of dialogs()) {
+                  report.push('Dialog offen: ' + desc(dlg) + ' Text: ' + norm(dlg.textContent).slice(0, 120));
                   const buttons = Array.from(dlg.querySelectorAll('button, [role="button"]')).filter(visible);
                   const confirm = buttons.find(b => ['übernehmen', 'fertig', 'bestätigen', 'ok', 'auswählen', 'anwenden'].includes(norm(b.textContent)));
-                  const close = buttons.find(b => /schließen|close|abbrechen|zurück/.test(norm(b.getAttribute('aria-label') || b.textContent)));
-                  if (confirm) confirm.click(); else if (close) close.click(); else esc(dlg);
-                  actions++;
+                  const close = buttons.find(b => /schließen|close|abbrechen/.test(norm(b.getAttribute('aria-label') || b.textContent)));
+                  if (confirm) { confirm.click(); fixed.push('Dialog bestätigt: ' + norm(confirm.textContent)); }
+                  else if (close) { close.click(); fixed.push('Dialog geschlossen'); }
+                  else esc(dlg);
                 }
                 esc(document.activeElement); esc(document);
                 await sleep(400);
               }
-              // Nichts mehr offen, aber Seite noch gesperrt: Sperre und Schleier entfernen.
-              if (!dialogs().length) {
-                for (const el of [document.documentElement, document.body]) {
-                  if (el.style.pointerEvents === 'none') { el.style.pointerEvents = ''; actions++; }
-                  if (el.style.overflow === 'hidden') { el.style.overflow = ''; actions++; }
-                  if (el.hasAttribute('inert')) { el.removeAttribute('inert'); actions++; }
+
+              // 2. Sperren über Attribute und Stile
+              document.querySelectorAll('[inert]').forEach(el => { el.removeAttribute('inert'); fixed.push('inert entfernt: ' + desc(el)); });
+              const form = document.getElementById('ad-title')?.closest('form') || document.querySelector('form');
+              const probes = () => [document.getElementById('ad-title'),
+                Array.from(document.querySelectorAll('button')).find(b => norm(b.textContent) === 'anzeige aufgeben'),
+                Array.from(document.querySelectorAll('button')).find(b => norm(b.textContent) === 'entwurf speichern')].filter(Boolean);
+              const relax = (el) => {
+                for (let a = el; a && a.nodeType === 1; a = a.parentElement) {
+                  const cs = getComputedStyle(a);
+                  if (cs.pointerEvents === 'none') { a.style.setProperty('pointer-events', 'auto', 'important'); fixed.push('pointer-events freigegeben: ' + desc(a)); }
+                  if (parseFloat(cs.opacity) < 1 && parseFloat(cs.opacity) > 0) { a.style.setProperty('opacity', '1', 'important'); fixed.push('Abdunkeln (opacity) entfernt: ' + desc(a)); }
+                  if (cs.filter !== 'none' && /brightness|grayscale|blur/.test(cs.filter)) { a.style.setProperty('filter', 'none', 'important'); fixed.push('Abdunkeln (filter) entfernt: ' + desc(a)); }
+                  if (a.hasAttribute('aria-hidden') && a.contains(form)) { a.removeAttribute('aria-hidden'); }
                 }
-                document.querySelectorAll('[inert]').forEach(el => { el.removeAttribute('inert'); actions++; });
-                document.querySelectorAll('[aria-hidden="true"]').forEach(el => {
-                  if (el.parentElement === document.body && el.querySelector('form, main')) { el.removeAttribute('aria-hidden'); actions++; }
-                });
-                const vw = window.innerWidth, vh = window.innerHeight;
-                Array.from(document.querySelectorAll('body *')).forEach(el => {
-                  const cs = getComputedStyle(el);
-                  if (cs.position !== 'fixed' || !visible(el)) return;
-                  const r = el.getBoundingClientRect();
-                  const covers = r.width >= vw * 0.9 && r.height >= vh * 0.9;
-                  const hasControls = el.querySelector('button, a, input, select, textarea, [role="button"]');
-                  if (covers && !hasControls) { el.style.display = 'none'; actions++; }
-                });
+              };
+              probes().forEach(relax);
+              if (!document.getElementById('ih-unblock-style')) {
+                const st = document.createElement('style'); st.id = 'ih-unblock-style';
+                st.textContent = '[data-ih-nopseudo]::before,[data-ih-nopseudo]::after{display:none!important;content:none!important}';
+                document.head.appendChild(st);
               }
-              return actions;
+              const pseudoOverlay = (el) => ['::before', '::after'].some(p => {
+                const cs = getComputedStyle(el, p);
+                return cs.content !== 'none' && cs.content !== 'normal' && (cs.position === 'fixed' || cs.position === 'absolute');
+              });
+
+              // 3. Treffer-Test: was liegt wirklich über Titel-Feld und Absende-Knopf?
+              for (const probe of probes()) {
+                for (let i = 0; i < 8; i++) {
+                  const r = probe.getBoundingClientRect();
+                  if (r.bottom < 0 || r.top > innerHeight) { probe.scrollIntoView({ block: 'center' }); await sleep(150); continue; }
+                  const x = r.left + Math.min(r.width / 2, 20), y = r.top + r.height / 2;
+                  const top = document.elementFromPoint(x, y);
+                  const name = probe.id || norm(probe.textContent);
+                  if (!top || top === probe || probe.contains(top)) { report.push('Treffer-Test ' + name + ': frei'); break; }
+                  report.push('Treffer-Test ' + name + ': verdeckt von ' + desc(top));
+                  if (top.contains(probe)) {
+                    // Schleier als ::before/::after eines Vorfahren, oder der Vorfahr fängt Taps ab
+                    let done = false;
+                    for (let a = top; a && a.nodeType === 1; a = a.parentElement) {
+                      if (pseudoOverlay(a) && !a.hasAttribute('data-ih-nopseudo')) { a.setAttribute('data-ih-nopseudo', '1'); fixed.push('Schleier (::before/::after) entfernt: ' + desc(a)); done = true; }
+                    }
+                    relax(probe);
+                    if (!done) { probe.style.setProperty('pointer-events', 'auto', 'important'); probe.style.setProperty('position', 'relative'); probe.style.setProperty('z-index', '2147483647'); fixed.push('Feld nach vorne geholt: ' + name); }
+                  } else {
+                    // Fremdes Element liegt darüber: obersten Vorfahren entfernen, der das Formular nicht enthält
+                    let overlay = top;
+                    while (overlay.parentElement && !overlay.parentElement.contains(probe)) overlay = overlay.parentElement;
+                    hide(overlay, 'Overlay entfernt');
+                  }
+                  await sleep(100);
+                }
+              }
+
+              // 4. Seitenweite Sperren an html/body
+              for (const el of [document.documentElement, document.body]) {
+                const cs = getComputedStyle(el);
+                if (cs.overflow === 'hidden') { el.style.setProperty('overflow', 'auto', 'important'); fixed.push('Scroll-Sperre entfernt: ' + el.tagName.toLowerCase()); }
+                if (pseudoOverlay(el) && !el.hasAttribute('data-ih-nopseudo')) { el.setAttribute('data-ih-nopseudo', '1'); fixed.push('Schleier (::before/::after) entfernt: ' + desc(el)); }
+              }
+              if (!fixed.length) report.push('Keine Sperre gefunden');
+              return { fixed, report };
             }
         """.trimIndent()
 
