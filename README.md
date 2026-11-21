@@ -8,6 +8,15 @@ Android-App, die aus ein paar Fotos eine fertige Kleinanzeige macht:
 4. Alles prüfen und bearbeiten, dann „An Kleinanzeigen übergeben“: Der Text landet in der
    Zwischenablage, die Fotos gehen per Teilen an die offizielle Kleinanzeigen-App.
 
+## eBay
+
+Neben Kleinanzeigen kann die App Anzeigen auch bei **ebay.de** einstellen, über eBays offizielle
+Verkäufer-Schnittstellen (Inventory, Media, Taxonomy, Account API). In der Prüfansicht wählt man unter
+„Wo einstellen?“ die Plattform. Für eBay meldet sich jeder Nutzer einmal mit seinem eBay-Konto an; die App
+schlägt Kategorie und Zustand vor, fragt eBays Pflichtmerkmale ab und veröffentlicht ein Festpreis-Angebot.
+Das Client Secret der eBay-Anwendung liegt nur in einem kleinen Cloudflare Worker
+(`tools/ebay-token-dienst`). Einrichtung Schritt für Schritt: [docs/eBay-Einrichtung.md](docs/eBay-Einrichtung.md).
+
 ## Stil und Tonalität
 
 In den Einstellungen lässt sich eine eigene Vorgabe hinterlegen, etwa „Schreibe immer in der Du-Form,

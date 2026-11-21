@@ -9,6 +9,12 @@ val signingPassword: String? = System.getenv("SIGNING_PASSWORD")?.takeIf { it.is
 val sharedKeystore = System.getenv("SIGNING_KEYSTORE_PATH")?.let { file(it) }?.takeIf { it.isFile && signingPassword != null }
 val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
 
+// eBay-Anbindung: nicht geheime Werte aus GitHub-Variablen (oder local gradle.properties). Das Secret liegt
+// nur im Token-Dienst, nie in der App. Siehe docs/eBay-Einrichtung.md.
+fun ebayValue(name: String): String =
+    (System.getenv(name) ?: providers.gradleProperty(name).orNull).orEmpty().trim()
+fun quoted(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
 android {
     namespace = "de.olidoh.inserathelfer"
     compileSdk = 36
@@ -21,6 +27,11 @@ android {
         // Jeder CI-Lauf zählt hoch, damit Android die neue APK als Update annimmt.
         versionCode = buildNumber
         versionName = "0.1.$buildNumber"
+
+        buildConfigField("String", "EBAY_CLIENT_ID", quoted(ebayValue("EBAY_CLIENT_ID")))
+        buildConfigField("String", "EBAY_RUNAME", quoted(ebayValue("EBAY_RUNAME")))
+        buildConfigField("String", "EBAY_TOKEN_SERVICE_URL", quoted(ebayValue("EBAY_TOKEN_SERVICE_URL")))
+        buildConfigField("boolean", "EBAY_SANDBOX", (ebayValue("EBAY_SANDBOX") == "true").toString())
     }
 
     signingConfigs {
@@ -50,7 +61,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 
     packaging {
         resources {

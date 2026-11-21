@@ -15,7 +15,12 @@ import de.olidoh.inserathelfer.core.ListingException
 import de.olidoh.inserathelfer.core.ListingGenerator
 import de.olidoh.inserathelfer.core.ListingStore
 import de.olidoh.inserathelfer.core.SavedListing
+import de.olidoh.inserathelfer.core.EbayPublication
+import de.olidoh.inserathelfer.core.ebay.EbayPublishResult
 import de.olidoh.inserathelfer.data.AiSettings
+import de.olidoh.inserathelfer.data.EbaySettings
+import de.olidoh.inserathelfer.data.Platform
+import de.olidoh.inserathelfer.ebay.EbayFlow
 import de.olidoh.inserathelfer.image.ImagePreparer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -24,7 +29,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.Executors
 
-enum class Screen { SETTINGS, CAPTURE, DETAILS, REVIEW, POST, HISTORY }
+enum class Screen { SETTINGS, CAPTURE, DETAILS, REVIEW, POST, HISTORY, EBAY_LOGIN, EBAY_POST }
 
 class ListingViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -54,6 +59,61 @@ class ListingViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var savedListings by mutableStateOf<List<SavedListing>>(emptyList())
         private set
+
+    /** eBay-Anmeldung und -Einstellen. */
+    val ebay = EbayFlow(EbaySettings(app), viewModelScope)
+
+    /** Plattform, auf der eingestellt wird; die letzte Wahl bleibt gespeichert. */
+    var platform by mutableStateOf(ebay.settings.platform)
+        private set
+
+    fun choosePlatform(p: Platform) {
+        platform = p
+        ebay.settings.platform = p
+    }
+
+    /** Wohin es nach der eBay-Anmeldung weitergeht. */
+    var afterEbayLogin = Screen.EBAY_POST
+        private set
+
+    /** „Einstellen“ auf der gewählten Plattform. */
+    fun startPosting() {
+        when (platform) {
+            Platform.KLEINANZEIGEN -> screen = Screen.POST
+            Platform.EBAY -> when {
+                !ebay.isConfigured -> error = "Die eBay-Anbindung ist in dieser App-Version noch nicht eingerichtet " +
+                    "(siehe Einstellungen > eBay)."
+                !ebay.loggedIn -> openEbayLogin(Screen.EBAY_POST)
+                else -> openEbayPost()
+            }
+        }
+    }
+
+    fun openEbayLogin(then: Screen) {
+        afterEbayLogin = then
+        screen = Screen.EBAY_LOGIN
+    }
+
+    fun onEbayLoginFinished(success: Boolean) {
+        val target = afterEbayLogin
+        if (success && target == Screen.EBAY_POST) openEbayPost() else screen = if (target == Screen.EBAY_POST) Screen.REVIEW else target
+    }
+
+    private fun openEbayPost() {
+        val d = draft ?: return
+        val saved = current?.ebay?.let { EbayPublishResult(it.listingId, it.url, emptyList()) }
+        ebay.prepare(current?.id ?: "neu", d, saved)
+        screen = Screen.EBAY_POST
+    }
+
+    /** Eindeutige Artikelnummer für eBay; gleich für dieselbe gespeicherte Anzeige. */
+    val ebaySku: String get() = current?.id ?: fallbackSku
+    private val fallbackSku = java.util.UUID.randomUUID().toString()
+
+    fun onEbayPublished(result: EbayPublishResult) {
+        val publication = EbayPublication(result.listingId, result.url, System.currentTimeMillis())
+        current = current?.copy(ebay = publication)?.also(::persist)
+    }
 
     /** Speichert die Einstellungen eines Anbieters und macht ihn zum aktiven. Leerer Schlüssel: alten behalten. */
     fun saveProvider(provider: AiProvider, apiKey: String, model: String, baseUrl: String) {

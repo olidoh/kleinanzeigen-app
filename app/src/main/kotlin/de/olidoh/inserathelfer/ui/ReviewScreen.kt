@@ -1,5 +1,7 @@
 package de.olidoh.inserathelfer.ui
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,6 +22,8 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,10 +40,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import de.olidoh.inserathelfer.ListingViewModel
-import de.olidoh.inserathelfer.Screen
 import de.olidoh.inserathelfer.core.CONDITIONS
 import de.olidoh.inserathelfer.core.ListingDraft
 import de.olidoh.inserathelfer.core.PriceType
+import de.olidoh.inserathelfer.data.Platform
 import de.olidoh.inserathelfer.share.KleinanzeigenHandoff
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -145,12 +149,40 @@ fun ReviewScreen(vm: ListingViewModel) {
                 }
             }
 
-            Button(
-                onClick = { vm.screen = Screen.POST },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Direkt bei Kleinanzeigen einstellen") }
+            HorizontalDivider()
+            Text("Wo einstellen?", style = MaterialTheme.typography.titleSmall)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Platform.entries.forEach { p ->
+                    FilterChip(
+                        selected = vm.platform == p,
+                        onClick = { vm.choosePlatform(p); vm.error = null },
+                        label = { Text(p.label) },
+                    )
+                }
+            }
+            vm.current?.ebay?.let { e ->
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Text("Bei eBay online", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                    TextButton(onClick = {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(e.url)))
+                    }) { Text("Angebot öffnen") }
+                }
+            }
+            vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
-            OutlinedButton(
+            Button(
+                onClick = vm::startPosting,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    when (vm.platform) {
+                        Platform.KLEINANZEIGEN -> "Direkt bei Kleinanzeigen einstellen"
+                        Platform.EBAY -> if (vm.current?.ebay != null) "eBay-Angebot aktualisieren" else "Bei eBay einstellen"
+                    },
+                )
+            }
+
+            if (vm.platform == Platform.KLEINANZEIGEN) OutlinedButton(
                 onClick = {
                     val result = KleinanzeigenHandoff.handOff(context, vm.photos.toList(), draft.title, draft.asShareText())
                     val hint = when (result) {

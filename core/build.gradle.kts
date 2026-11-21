@@ -17,7 +17,8 @@ dependencies {
     // Offizielles Anthropic-SDK (Java/Kotlin) für die Claude API
     api("com.anthropic:anthropic-java:3.3.0")
     // HTTP für OpenAI-kompatible Anbieter (Mistral, Langdock, OpenAI …)
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // api: Die App ruft die eBay-Klassen direkt auf, deren Konstruktoren OkHttpClient erwähnen.
+    api("com.squareup.okhttp3:okhttp:4.12.0")
 
     testImplementation(kotlin("test"))
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
