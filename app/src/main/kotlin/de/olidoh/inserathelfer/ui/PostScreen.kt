@@ -67,7 +67,8 @@ fun PostScreen(vm: ListingViewModel) {
     var unblockReport by remember { mutableStateOf<String?>(null) }
     var showReport by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    val filler = remember(draft) { KleinanzeigenWebFiller(draft, vm.photos.toList()) }
+    val photoOrder = vm.photos.toList()
+    val filler = remember(draft, photoOrder) { KleinanzeigenWebFiller(draft, photoOrder) }
     val diagnostics = remember { WebDiagnostics() }
     // Gegenprobe: Seite ohne automatisches Ausfüllen laden, um die App als Ursache auszuschließen.
     var autoFill by remember { mutableStateOf(true) }

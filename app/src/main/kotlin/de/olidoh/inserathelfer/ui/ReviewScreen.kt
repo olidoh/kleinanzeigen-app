@@ -75,6 +75,8 @@ fun ReviewScreen(vm: ListingViewModel) {
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            PhotoRow(vm, removable = false, thumbSize = 88)
+
             CopyableField(
                 label = "Titel (${draft.title.length}/${ListingDraft.MAX_TITLE_LENGTH})",
                 value = draft.title,

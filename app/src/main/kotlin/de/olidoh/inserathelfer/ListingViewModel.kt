@@ -89,6 +89,15 @@ class ListingViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Macht [file] zum Titelbild: Es steht vorne und wird bei Kleinanzeigen als erstes Bild hochgeladen. */
+    fun setCoverPhoto(file: File) {
+        val index = photos.indexOf(file)
+        if (index <= 0) return
+        photos.removeAt(index)
+        photos.add(0, file)
+        current = current?.copy(photos = photos.toList())?.also(::persist)
+    }
+
     fun removePhoto(file: File) {
         photos.remove(file)
         // Fotos einer gespeicherten Anzeige bleiben im Speicher, nur Kamera-Fotos werden gelöscht.
@@ -121,6 +130,11 @@ class ListingViewModel(app: Application) : AndroidViewModel(app) {
                     } else {
                         runCatching { store.create(generated, images, notes) }.getOrNull()
                     }
+                }
+                // Ab jetzt mit den gespeicherten Kopien arbeiten, damit Titelbild-Wahl und Reihenfolge erhalten bleiben.
+                current?.photos?.takeIf { it.size == images.size && photos.toList() == images }?.let {
+                    photos.clear()
+                    photos.addAll(it)
                 }
                 screen = Screen.REVIEW
             } catch (e: ListingException) {
