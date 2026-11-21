@@ -89,6 +89,11 @@ jobs:
       - name: Tests und Release-APK bauen
         env:
           SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+          # eBay-Anbindung (nicht geheim, GitHub-Variablen; wirkt, sobald die eBay-Funktion gemergt ist)
+          EBAY_CLIENT_ID: ${{ vars.EBAY_CLIENT_ID }}
+          EBAY_RUNAME: ${{ vars.EBAY_RUNAME }}
+          EBAY_TOKEN_SERVICE_URL: ${{ vars.EBAY_TOKEN_SERVICE_URL }}
+          EBAY_SANDBOX: ${{ vars.EBAY_SANDBOX }}
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon :core:test :app:assembleInternRelease
