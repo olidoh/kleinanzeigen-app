@@ -2,8 +2,6 @@ package de.olidoh.inserathelfer.ui
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
-import android.content.Intent
-import android.net.Uri
 import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
 import androidx.compose.material.icons.filled.MoreVert
@@ -149,14 +147,6 @@ fun PostScreen(vm: ListingViewModel) {
                                 autoFill = true
                                 fillPhotos = true
                                 webView?.loadUrl(KleinanzeigenWebFiller.POST_URL)
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Im Browser öffnen (Text wird kopiert)") },
-                            onClick = {
-                                menuOpen = false
-                                KleinanzeigenHandoff.copyToClipboard(context, "Anzeige", draft.asShareText())
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(KleinanzeigenWebFiller.POST_URL)))
                             },
                         )
                     }

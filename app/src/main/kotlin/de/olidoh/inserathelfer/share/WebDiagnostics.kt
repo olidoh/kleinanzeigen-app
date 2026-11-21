@@ -134,6 +134,8 @@ class WebDiagnostics {
               out.htmlBody = ['html', 'body'].map(t => { const cs = getComputedStyle(document.querySelector(t)); return t + ' pe=' + cs.pointerEvents + ' overflow=' + cs.overflow + ' touch-action=' + cs.touchAction; }).join('; ');
               out.dialoge = Array.from(document.querySelectorAll('[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open], [role="listbox"]'))
                 .map(el => d(el) + ' "' + norm(el.textContent).slice(0, 60) + '"');
+              const modal = Array.from(document.querySelectorAll('dialog[open]')).filter(x => x.matches(':modal'));
+              out.modaleDialoge = modal.map(x => d(x) + ' "' + norm(x.textContent).slice(0, 50) + '"').join(' | ') || 'keine';
               out.versteckt = Array.from(document.querySelectorAll('[data-ih-hidden], [data-ih-nopseudo]')).map(d);
               const probes = [document.getElementById('ad-title'),
                 Array.from(document.querySelectorAll('button')).find(b => norm(b.textContent) === 'anzeige aufgeben')].filter(Boolean);
