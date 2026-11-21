@@ -32,6 +32,7 @@ data class EbayConfig(
     val authHost: String get() = if (sandbox) "https://auth.sandbox.ebay.com" else "https://auth.ebay.com"
     val apiHost: String get() = if (sandbox) "https://api.sandbox.ebay.com" else "https://api.ebay.com"
     val mediaHost: String get() = if (sandbox) "https://apim.sandbox.ebay.com" else "https://apim.ebay.com"
+    val identityHost: String get() = if (sandbox) "https://apiz.sandbox.ebay.com" else "https://apiz.ebay.com"
 
     companion object {
         /** Rechte, die die App beim Nutzer anfragt: Grunddaten, Angebote anlegen, Versand-/Zahlungsgrundsätze lesen. */
@@ -39,6 +40,8 @@ data class EbayConfig(
             "https://api.ebay.com/oauth/api_scope",
             "https://api.ebay.com/oauth/api_scope/sell.inventory",
             "https://api.ebay.com/oauth/api_scope/sell.account",
+            // Nur um anzuzeigen, mit welchem eBay-Konto man angemeldet ist.
+            "https://api.ebay.com/oauth/api_scope/commerce.identity.readonly",
         )
     }
 }
@@ -81,6 +84,8 @@ class EbayAuth(
         append("&scope=").append(enc(EbayConfig.SCOPES.joinToString(" ")))
         append("&state=").append(enc(state))
         append("&locale=de-DE")
+        // Immer nach den Zugangsdaten fragen, damit man ein anderes eBay-Konto wählen kann.
+        append("&prompt=login")
     }
 
     /**

@@ -32,7 +32,7 @@ class EbayTest {
 
     private fun client(): EbayClient {
         val base = server.url("/").toString().trimEnd('/')
-        return EbayClient(config(), accessToken = { "tok" }, apiHost = base, mediaHost = base)
+        return EbayClient(config(), accessToken = { "tok" }, apiHost = base, mediaHost = base, identityHost = base)
     }
 
     private fun json(body: String, code: Int = 200) = MockResponse().setResponseCode(code).setBody(body)
@@ -45,6 +45,14 @@ class EbayTest {
         assertTrue(url.contains("sell.inventory"))
         assertTrue(url.contains("%20"))
         assertTrue(url.contains("state=st-1"))
+        assertTrue(url.contains("prompt=login"))
+    }
+
+    @Test
+    fun `user name of the signed in account`() {
+        server.enqueue(json("""{"userId":"u1","username":"oli_verkauft"}"""))
+        assertEquals("oli_verkauft", client().userName())
+        assertEquals("/commerce/identity/v1/user/", server.takeRequest().path)
     }
 
     @Test

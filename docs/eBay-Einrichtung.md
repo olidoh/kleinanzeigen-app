@@ -126,6 +126,17 @@ Ohne die Variablen lässt sich die eBay-Anbindung testweise auch in der App unte
 4. Kategorie prüfen, Pflichtangaben (z. B. Marke) ausfüllen, PLZ eingeben, **Jetzt bei eBay einstellen**.
    Das Angebot geht sofort online; eBay berechnet dafür ggf. Gebühren.
 
+## Später einrichten, Konto wechseln
+
+- Die App läuft auch ohne eBay. Solange nichts eingerichtet ist, zeigt sie bei „eBay“ nur einen Hinweis mit dem
+  Weg in die Einstellungen; Anzeigen bleiben unter „Meine Anzeigen“ gespeichert und lassen sich später bei eBay einstellen.
+- Die Daten der eBay-Anwendung (App ID, RuName, Adresse des Token-Dienstes) lassen sich jederzeit in der App unter
+  **Einstellungen > eBay > Erweiterte eBay-Einstellungen** nachtragen, ganz ohne neuen Build. Die GitHub-Variablen aus
+  Schritt 6 sind nur bequemer, weil dann jede neue APK die Werte schon mitbringt.
+- Jeder Nutzer meldet sich mit seinem eigenen eBay-Konto an. Unter **Einstellungen > eBay** steht, welches Konto
+  angemeldet ist; **Anderes Konto** meldet ab, löscht die eBay-Cookies im WebView und öffnet die Anmeldung neu.
+  Die Kleinanzeigen-Anmeldung bleibt dabei erhalten.
+
 ## Optional: Testumgebung (Sandbox)
 
 Zum gefahrlosen Ausprobieren gibt es bei eBay eine Sandbox mit eigenen Schlüsseln und Testkonten

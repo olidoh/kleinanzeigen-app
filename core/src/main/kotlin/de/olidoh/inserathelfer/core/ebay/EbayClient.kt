@@ -68,7 +68,13 @@ class EbayClient(
     private val http: OkHttpClient = defaultClient,
     private val apiHost: String = config.apiHost,
     private val mediaHost: String = config.mediaHost,
+    private val identityHost: String = config.identityHost,
 ) {
+
+    /** eBay-Benutzername des angemeldeten Kontos. */
+    fun userName(): String =
+        get("$identityHost/commerce/identity/v1/user/").path("username").asText("")
+
 
     private var categoryTreeId: String? = null
 

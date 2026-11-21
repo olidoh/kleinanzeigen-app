@@ -71,6 +71,11 @@ class EbaySettings(context: Context) {
             }
         }
 
+    /** eBay-Benutzername des angemeldeten Kontos (nur zur Anzeige). */
+    var accountName: String
+        get() = prefs.getString("account_name", "").orEmpty()
+        set(v) = prefs.edit().putString("account_name", v.trim()).apply()
+
     var postalCode: String
         get() = prefs.getString("postal_code", "").orEmpty()
         set(v) = prefs.edit().putString("postal_code", v.trim()).apply()

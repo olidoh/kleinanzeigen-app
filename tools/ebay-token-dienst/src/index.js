@@ -15,6 +15,7 @@ const ALLOWED_SCOPES = new Set([
   "https://api.ebay.com/oauth/api_scope",
   "https://api.ebay.com/oauth/api_scope/sell.inventory",
   "https://api.ebay.com/oauth/api_scope/sell.account",
+  "https://api.ebay.com/oauth/api_scope/commerce.identity.readonly",
 ]);
 
 export default {

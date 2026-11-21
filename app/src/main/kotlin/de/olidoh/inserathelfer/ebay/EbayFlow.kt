@@ -34,7 +34,19 @@ class EbayFlow(val settings: EbaySettings, private val scope: CoroutineScope) {
     var loggedIn by mutableStateOf(settings.tokens?.refreshValid(System.currentTimeMillis()) == true)
         private set
 
-    val isConfigured: Boolean get() = settings.config().isComplete
+    /** Ob App ID, RuName und Token-Dienst bekannt sind (eingebaut oder in den Einstellungen nachgetragen). */
+    var isConfigured by mutableStateOf(settings.config().isComplete)
+        private set
+
+    /** eBay-Benutzername des angemeldeten Kontos, leer wenn unbekannt. */
+    var accountName by mutableStateOf(settings.accountName)
+        private set
+
+    /** Nach dem Ändern der eBay-Daten in den Einstellungen aufrufen. */
+    fun reloadConfig() {
+        isConfigured = settings.config().isComplete
+        client = null
+    }
 
     // --- Anmeldung -------------------------------------------------------------------------------
 
@@ -70,6 +82,10 @@ class EbayFlow(val settings: EbaySettings, private val scope: CoroutineScope) {
                         val tokens = withContext(Dispatchers.IO) { auth.exchangeCode(result.code) }
                         settings.tokens = tokens
                         loggedIn = true
+                        client = null
+                        val name = withContext(Dispatchers.IO) { runCatching { client().userName() }.getOrDefault("") }
+                        settings.accountName = name
+                        accountName = name
                         onDone(true)
                     } catch (e: EbayException) {
                         loginError = e.message
@@ -84,9 +100,15 @@ class EbayFlow(val settings: EbaySettings, private val scope: CoroutineScope) {
         return true
     }
 
+    /** Abmelden; die eBay-Cookies im WebView werden mit gelöscht, damit ein anderes Konto möglich ist. */
     fun logout() {
         settings.tokens = null
+        settings.accountName = ""
+        accountName = ""
         loggedIn = false
+        client = null
+        preparedFor = null
+        EbayCookies.clear()
     }
 
     /** Gültiger Zugang; erneuert ihn bei Bedarf. Nur außerhalb des Hauptthreads aufrufen. */

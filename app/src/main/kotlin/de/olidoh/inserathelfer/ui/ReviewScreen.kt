@@ -40,6 +40,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import de.olidoh.inserathelfer.ListingViewModel
+import de.olidoh.inserathelfer.Screen
 import de.olidoh.inserathelfer.core.CONDITIONS
 import de.olidoh.inserathelfer.core.ListingDraft
 import de.olidoh.inserathelfer.core.PriceType
@@ -170,8 +171,31 @@ fun ReviewScreen(vm: ListingViewModel) {
             }
             vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
+            val ebayMissing = vm.platform == Platform.EBAY && !vm.ebay.isConfigured
+            if (ebayMissing) {
+                Text(
+                    "eBay ist noch nicht eingerichtet. Das geht jederzeit später in den Einstellungen; " +
+                        "die Anzeige bleibt bis dahin unter „Meine Anzeigen“ gespeichert.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                OutlinedButton(onClick = { vm.screen = Screen.SETTINGS }, modifier = Modifier.fillMaxWidth()) {
+                    Text("eBay in den Einstellungen einrichten")
+                }
+            } else if (vm.platform == Platform.EBAY) {
+                Text(
+                    if (vm.ebay.loggedIn) {
+                        "Angemeldet bei eBay" + vm.ebay.accountName.takeIf { it.isNotBlank() }?.let { " als $it" }.orEmpty() +
+                            ". Konto wechseln: Einstellungen > eBay."
+                    } else {
+                        "Du meldest dich gleich einmal mit deinem eBay-Konto an."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+
             Button(
                 onClick = vm::startPosting,
+                enabled = !ebayMissing,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(
