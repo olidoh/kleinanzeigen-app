@@ -85,7 +85,10 @@ class KleinanzeigenWebFiller(
         private const val MAX_PHOTOS = 20
         private const val UPLOAD_EDGE = 2048
 
-        fun isPostingForm(url: String) = url.contains("p-anzeige-aufgeben")
+        fun isPostingForm(url: String) = url.contains("p-anzeige-aufgeben") && !isConfirmation(url)
+
+        /** Seite nach erfolgreichem Aufgeben (z. B. p-anzeige-aufgeben-bestaetigung.html). */
+        fun isConfirmation(url: String) = url.contains("bestaetigung")
 
         fun isLogin(url: String) = url.contains("login.kleinanzeigen.de") || url.contains("m-einloggen")
 

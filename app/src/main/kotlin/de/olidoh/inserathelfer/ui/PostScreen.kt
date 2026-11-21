@@ -106,6 +106,10 @@ fun PostScreen(vm: ListingViewModel) {
                             override fun onPageFinished(view: WebView, url: String) {
                                 CookieManager.getInstance().flush()
                                 status = when {
+                                    KleinanzeigenWebFiller.isConfirmation(url) -> {
+                                        vm.setPublished(true)
+                                        "Veröffentlicht und unter „Meine Anzeigen“ vermerkt. Mit dem Pfeil oben geht es zurück."
+                                    }
                                     KleinanzeigenWebFiller.isPostingForm(url) -> {
                                         fill(view)
                                         "Formular wird ausgefüllt …"

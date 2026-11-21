@@ -13,14 +13,18 @@ import de.olidoh.inserathelfer.core.AiProvider
 import de.olidoh.inserathelfer.core.ListingDraft
 import de.olidoh.inserathelfer.core.ListingException
 import de.olidoh.inserathelfer.core.ListingGenerator
+import de.olidoh.inserathelfer.core.ListingStore
+import de.olidoh.inserathelfer.core.SavedListing
 import de.olidoh.inserathelfer.data.AiSettings
 import de.olidoh.inserathelfer.image.ImagePreparer
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.Executors
 
-enum class Screen { SETTINGS, CAPTURE, DETAILS, REVIEW, POST }
+enum class Screen { SETTINGS, CAPTURE, DETAILS, REVIEW, POST, HISTORY }
 
 class ListingViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -38,6 +42,18 @@ class ListingViewModel(app: Application) : AndroidViewModel(app) {
     var isGenerating by mutableStateOf(false)
         private set
     var error by mutableStateOf<String?>(null)
+
+    /** Dauerhafter Speicher für erstellte Anzeigen (Fotos und Text). */
+    private val store = ListingStore(File(app.filesDir, "listings"))
+
+    /** Schreibzugriffe nacheinander ausführen, damit sich schnelle Änderungen nicht überholen. */
+    private val storeDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+
+    /** Gespeicherte Anzeige, die gerade bearbeitet wird; null, solange noch nichts erzeugt wurde. */
+    var current by mutableStateOf<SavedListing?>(null)
+        private set
+    var savedListings by mutableStateOf<List<SavedListing>>(emptyList())
+        private set
 
     /** Speichert die Einstellungen eines Anbieters und macht ihn zum aktiven. Leerer Schlüssel: alten behalten. */
     fun saveProvider(provider: AiProvider, apiKey: String, model: String, baseUrl: String) {
@@ -66,7 +82,8 @@ class ListingViewModel(app: Application) : AndroidViewModel(app) {
 
     fun removePhoto(file: File) {
         photos.remove(file)
-        file.delete()
+        // Fotos einer gespeicherten Anzeige bleiben im Speicher, nur Kamera-Fotos werden gelöscht.
+        if (file.parentFile == ImagePreparer.photoDir(getApplication())) file.delete()
     }
 
     fun generate() {
@@ -81,9 +98,19 @@ class ListingViewModel(app: Application) : AndroidViewModel(app) {
         val notes = sellerNotes
         viewModelScope.launch {
             try {
-                draft = withContext(Dispatchers.IO) {
+                val generated = withContext(Dispatchers.IO) {
                     val jpegs = images.take(ListingGenerator.MAX_IMAGES).map(ImagePreparer::jpegForAi)
                     ListingGenerator.create(config).generate(jpegs, notes)
+                }
+                draft = generated
+                openedFromHistory = false
+                current = withContext(storeDispatcher) {
+                    val existing = current
+                    if (existing != null && existing.photos == images) {
+                        existing.copy(draft = generated, sellerNotes = notes).also(store::update)
+                    } else {
+                        runCatching { store.create(generated, images, notes) }.getOrNull()
+                    }
                 }
                 screen = Screen.REVIEW
             } catch (e: ListingException) {
@@ -97,13 +124,73 @@ class ListingViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun updateDraft(transform: (ListingDraft) -> ListingDraft) {
-        draft = draft?.let(transform)
+        val updated = draft?.let(transform) ?: return
+        draft = updated
+        current = current?.copy(draft = updated)?.also(::persist)
     }
 
-    /** Neue Anzeige beginnen: Fotos und Entwurf verwerfen. */
-    fun startOver() {
-        ImagePreparer.photoDir(getApplication()).listFiles()?.forEach { it.delete() }
+    private fun persist(listing: SavedListing) {
+        viewModelScope.launch(storeDispatcher) { runCatching { store.update(listing) } }
+    }
+
+    /** Markiert die aktuelle Anzeige als veröffentlicht (oder nimmt die Markierung zurück). */
+    fun setPublished(published: Boolean) {
+        val listing = current ?: return
+        current = listing.copy(publishedAt = if (published) System.currentTimeMillis() else null).also(::persist)
+    }
+
+    /** Zurück aus der Prüfansicht: zu „Meine Anzeigen“, wenn die Anzeige von dort geöffnet wurde. */
+    fun leaveReview() {
+        screen = if (openedFromHistory) Screen.HISTORY else Screen.DETAILS
+        if (openedFromHistory) refreshHistory()
+    }
+
+    private var openedFromHistory = false
+
+    fun showHistory() {
+        screen = Screen.HISTORY
+        refreshHistory()
+    }
+
+    fun refreshHistory() {
+        viewModelScope.launch {
+            savedListings = withContext(storeDispatcher) { runCatching { store.list() }.getOrDefault(emptyList()) }
+        }
+    }
+
+    /** Öffnet eine gespeicherte Anzeige, um sie anzusehen, zu ändern oder zu veröffentlichen. */
+    fun openSaved(listing: SavedListing) {
+        clearCachePhotos()
         photos.clear()
+        photos.addAll(listing.photos)
+        sellerNotes = listing.sellerNotes
+        draft = listing.draft
+        current = listing
+        error = null
+        openedFromHistory = true
+        screen = Screen.REVIEW
+    }
+
+    fun deleteSaved(listing: SavedListing) {
+        if (current?.id == listing.id) {
+            current = null
+            photos.clear()
+            draft = null
+        }
+        savedListings = savedListings.filterNot { it.id == listing.id }
+        viewModelScope.launch(storeDispatcher) { runCatching { store.delete(listing.id) } }
+    }
+
+    private fun clearCachePhotos() {
+        ImagePreparer.photoDir(getApplication()).listFiles()?.forEach { it.delete() }
+    }
+
+    /** Neue Anzeige beginnen. Gespeicherte Anzeigen bleiben unter „Meine Anzeigen“ erhalten. */
+    fun startOver() {
+        clearCachePhotos()
+        photos.clear()
+        current = null
+        openedFromHistory = false
         sellerNotes = ""
         draft = null
         error = null
