@@ -80,7 +80,7 @@ class KleinanzeigenWebFiller(
         if (obj.optBoolean("skipped")) return "Formular ist bereits ausgefüllt. Neu ausfüllen über das Zauberstab-Symbol oben."
         val missing = obj.optJSONArray("missing")?.let { arr -> List(arr.length()) { arr.getString(it) } }.orEmpty()
         return if (missing.isEmpty()) {
-            "Alles ausgefüllt. Bitte prüfen und unten auf „Anzeige aufgeben“ tippen."
+            "Alles ausgefüllt. Bitte prüfen und unten auf „Anzeige aufgeben“ tippen. Ist die Seite grau, oben auf das Schloss tippen."
         } else {
             val categoryHint = if (missing.any { it.startsWith("Kategorie") }) {
                 "Bei Kategorie auf „Wähle deine Kategorie“ tippen, Vorschlag: ${draft.category}. "
@@ -102,13 +102,78 @@ class KleinanzeigenWebFiller(
         /** Seite nach erfolgreichem Aufgeben (z. B. p-anzeige-aufgeben-bestaetigung.html). */
         fun isConfirmation(url: String) = url.contains("bestaetigung")
 
+        /** Notfall-Knopf: offene Auswahlfenster schließen und einen grauen Schleier entfernen. */
+        fun unblock(view: WebView, onResult: (String) -> Unit) {
+            view.evaluateJavascript("window.__ihUnblocked = null; ($UNBLOCK_SCRIPT)().then(n => window.__ihUnblocked = n);", null)
+            Handler(Looper.getMainLooper()).postDelayed({
+                view.evaluateJavascript("window.__ihUnblocked") { raw ->
+                    onResult(
+                        if (raw == null || raw == "null" || raw == "0") "Keine Sperre gefunden. Hilft das nicht, mit dem Pfeil zurück und die Seite neu öffnen."
+                        else "Seite freigegeben. Bitte die Auswahlfelder kurz prüfen.",
+                    )
+                }
+            }, 1800)
+        }
+
         fun isLogin(url: String) = url.contains("login.kleinanzeigen.de") || url.contains("m-einloggen")
+
+        /**
+         * Schließt offene Auswahlfenster und entfernt einen übrig gebliebenen grauen Schleier,
+         * der Klicks auf „Anzeige aufgeben“ blockiert. Ergebnis: Anzahl der Eingriffe.
+         */
+        val UNBLOCK_SCRIPT = """
+            async function () {
+              const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+              const norm = (s) => (s || '').trim().toLowerCase();
+              const visible = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
+                return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && cs.opacity !== '0'; };
+              const esc = (t) => ['keydown', 'keyup'].forEach(type => (t || document).dispatchEvent(
+                new KeyboardEvent(type, { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true })));
+              let actions = 0;
+              const dialogs = () => Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"], dialog[open]')).filter(visible);
+              for (let round = 0; round < 3 && dialogs().length; round++) {
+                for (const dlg of dialogs()) {
+                  const buttons = Array.from(dlg.querySelectorAll('button, [role="button"]')).filter(visible);
+                  const confirm = buttons.find(b => ['übernehmen', 'fertig', 'bestätigen', 'ok', 'auswählen', 'anwenden'].includes(norm(b.textContent)));
+                  const close = buttons.find(b => /schließen|close|abbrechen|zurück/.test(norm(b.getAttribute('aria-label') || b.textContent)));
+                  if (confirm) confirm.click(); else if (close) close.click(); else esc(dlg);
+                  actions++;
+                }
+                esc(document.activeElement); esc(document);
+                await sleep(400);
+              }
+              // Nichts mehr offen, aber Seite noch gesperrt: Sperre und Schleier entfernen.
+              if (!dialogs().length) {
+                for (const el of [document.documentElement, document.body]) {
+                  if (el.style.pointerEvents === 'none') { el.style.pointerEvents = ''; actions++; }
+                  if (el.style.overflow === 'hidden') { el.style.overflow = ''; actions++; }
+                  if (el.hasAttribute('inert')) { el.removeAttribute('inert'); actions++; }
+                }
+                document.querySelectorAll('[inert]').forEach(el => { el.removeAttribute('inert'); actions++; });
+                document.querySelectorAll('[aria-hidden="true"]').forEach(el => {
+                  if (el.parentElement === document.body && el.querySelector('form, main')) { el.removeAttribute('aria-hidden'); actions++; }
+                });
+                const vw = window.innerWidth, vh = window.innerHeight;
+                Array.from(document.querySelectorAll('body *')).forEach(el => {
+                  const cs = getComputedStyle(el);
+                  if (cs.position !== 'fixed' || !visible(el)) return;
+                  const r = el.getBoundingClientRect();
+                  const covers = r.width >= vw * 0.9 && r.height >= vh * 0.9;
+                  const hasControls = el.querySelector('button, a, input, select, textarea, [role="button"]');
+                  if (covers && !hasControls) { el.style.display = 'none'; actions++; }
+                });
+              }
+              return actions;
+            }
+        """.trimIndent()
 
         /**
          * Läuft in der Seite. Setzt Werte so, dass das React-Formular sie übernimmt
          * (nativer Setter plus input/change-Events), und legt das Ergebnis in window.__ihResult ab.
          */
-        private val FILL_SCRIPT = """
+        private val FILL_SCRIPT get() = FILL_TEMPLATE.replace("__UNBLOCK__", UNBLOCK_SCRIPT)
+
+        private val FILL_TEMPLATE = """
             async function (d) {
               const missing = [];
               const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -123,13 +188,22 @@ class KleinanzeigenWebFiller(
                 for (let t = 0; t < ms; t += 250) { const v = fn(); if (v) return v; await sleep(250); }
                 return null;
               }
+              // Voller Zeiger-Ablauf, weil manche Auswahllisten erst auf pointerup reagieren.
+              const realClick = (el) => {
+                const o = { bubbles: true, cancelable: true, view: window, button: 0, pointerId: 1, pointerType: 'touch', isPrimary: true };
+                el.dispatchEvent(new PointerEvent('pointerdown', o)); el.dispatchEvent(new MouseEvent('mousedown', o));
+                el.dispatchEvent(new PointerEvent('pointerup', o)); el.dispatchEvent(new MouseEvent('mouseup', o));
+                el.click();
+              };
+              const unblock = (__UNBLOCK__);
               async function pickOption(combo, label) {
-                combo.click();
+                realClick(combo);
                 const opt = await waitFor(() => Array.from(document.querySelectorAll('[role="option"]'))
                   .find(o => norm(o.textContent) === norm(label)), 3000);
-                if (opt) { opt.click(); return true; }
-                combo.click();
-                return false;
+                if (opt) realClick(opt);
+                await sleep(300);
+                await unblock();
+                return !!opt;
               }
               // Kategorie-Vorschläge von Kleinanzeigen: passendsten anklicken (Wortüberlappung mit dem KI-Vorschlag).
               async function pickSuggestedCategory(wanted) {
@@ -148,9 +222,6 @@ class KleinanzeigenWebFiller(
                   best.click();
                   if (await waitFor(() => { const c = document.querySelector('input[name="categoryId"]'); return c && c.value; }, 3000)) return true;
                 }
-                // Kein Vorschlag: Kategorie-Auswahl der Seite öffnen, damit der Nutzer direkt wählen kann.
-                const picker = Array.from(box.querySelectorAll('a, button')).find(isPicker);
-                if (picker) picker.click();
                 return false;
               }
               try {
@@ -206,8 +277,17 @@ class KleinanzeigenWebFiller(
                     if (!(await pickOption(combo, d.condition))) missing.push('Zustand (' + d.condition + ')');
                   }
                 }
+                await unblock();
+                // Keine Kategorie: erst jetzt die Kategorie-Auswahl der Seite öffnen, damit der Nutzer direkt wählen kann.
+                if (!category) {
+                  const box = document.getElementById('ad-category-suggestions');
+                  const picker = box && Array.from(box.querySelectorAll('a, button'))
+                    .find(el => norm(el.textContent).startsWith('wähle deine kategorie'));
+                  if (picker) realClick(picker);
+                }
                 window.__ihResult = { missing };
               } catch (e) {
+                try { await unblock(); } catch (_) {}
                 window.__ihResult = { missing: ['Fehler beim Ausfüllen: ' + e.message] };
               }
             }

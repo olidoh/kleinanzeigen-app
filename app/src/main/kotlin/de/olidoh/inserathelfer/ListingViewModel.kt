@@ -62,6 +62,15 @@ class ListingViewModel(app: Application) : AndroidViewModel(app) {
         if (aiConfig != null) screen = Screen.CAPTURE
     }
 
+    /** Dauerhafte Vorgabe zu Stil und Tonalität (z. B. „immer in der Du-Form“). */
+    var styleGuide by mutableStateOf(settings.styleGuide)
+        private set
+
+    fun saveStyleGuide(text: String) {
+        settings.styleGuide = text
+        styleGuide = settings.styleGuide
+    }
+
     fun removeKey(provider: AiProvider) {
         settings.removeKey(provider)
         aiConfig = settings.currentConfig()
@@ -96,11 +105,12 @@ class ListingViewModel(app: Application) : AndroidViewModel(app) {
         error = null
         val images = photos.toList()
         val notes = sellerNotes
+        val style = styleGuide
         viewModelScope.launch {
             try {
                 val generated = withContext(Dispatchers.IO) {
                     val jpegs = images.take(ListingGenerator.MAX_IMAGES).map(ImagePreparer::jpegForAi)
-                    ListingGenerator.create(config).generate(jpegs, notes)
+                    ListingGenerator.create(config).generate(jpegs, notes, style)
                 }
                 draft = generated
                 openedFromHistory = false

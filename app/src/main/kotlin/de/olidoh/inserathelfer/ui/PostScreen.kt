@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,6 +66,9 @@ fun PostScreen(vm: ListingViewModel) {
                     }
                 },
                 actions = {
+                    IconButton(onClick = { webView?.let { v -> KleinanzeigenWebFiller.unblock(v) { status = it } } }) {
+                        Icon(Icons.Filled.LockOpen, contentDescription = "Seite freigeben")
+                    }
                     IconButton(onClick = { webView?.let { fill(it) } }) {
                         Icon(Icons.Filled.AutoFixHigh, contentDescription = "Erneut ausfüllen")
                     }

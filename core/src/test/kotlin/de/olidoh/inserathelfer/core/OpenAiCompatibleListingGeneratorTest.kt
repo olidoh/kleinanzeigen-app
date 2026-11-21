@@ -45,7 +45,7 @@ class OpenAiCompatibleListingGeneratorTest {
                     "\"condition\":\"Sehr gut\",\"priceReasoning\":\"Neupreis 60 €.\"}\n```",
             ),
         )
-        val draft = generator().generate(List(6) { byteArrayOf(1, 2, 3) }, "Größe M")
+        val draft = generator().generate(List(6) { byteArrayOf(1, 2, 3) }, "Größe M", "Schreibe immer in der Du-Form.")
 
         assertEquals("Fahrradhelm Uvex, Größe M", draft.title)
         assertEquals(20, draft.priceEur)
@@ -61,7 +61,16 @@ class OpenAiCompatibleListingGeneratorTest {
         val images = userContent.filter { it.path("type").asText() == "image_url" }
         assertEquals(ListingGenerator.MAX_IMAGES, images.size)
         assertTrue(images.first().path("image_url").path("url").asText().startsWith("data:image/jpeg;base64,"))
-        assertTrue(userContent.last().path("text").asText().contains("Größe M"))
+        val text = userContent.last().path("text").asText()
+        assertTrue(text.contains("Größe M"))
+        assertTrue(text.contains("Tonalität") && text.contains("Schreibe immer in der Du-Form."))
+    }
+
+    @Test
+    fun `user prompt without style guide has no style section`() {
+        val prompt = ListingPrompt.userPrompt("Kratzer am Rahmen", "   ")
+        assertTrue(!prompt.contains("Tonalität"))
+        assertTrue(prompt.endsWith("Hinweise des Verkäufers:\nKratzer am Rahmen"))
     }
 
     @Test
