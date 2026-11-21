@@ -2,7 +2,14 @@ package de.olidoh.inserathelfer.ui
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.content.Intent
+import android.net.Uri
+import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import de.olidoh.inserathelfer.share.WebDiagnostics
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.heightIn
@@ -62,10 +69,26 @@ fun PostScreen(vm: ListingViewModel) {
     var showReport by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val filler = remember(draft) { KleinanzeigenWebFiller(draft, vm.photos.toList()) }
+    val diagnostics = remember { WebDiagnostics() }
+    // Gegenprobe: Seite ohne automatisches Ausfüllen laden, um die App als Ursache auszuschließen.
+    var autoFill by remember { mutableStateOf(true) }
+    var fillPhotos by remember { mutableStateOf(true) }
+    var menuOpen by remember { mutableStateOf(false) }
+
+    fun showDiagnostics() {
+        webView?.let { v ->
+            status = "Bericht wird erstellt …"
+            diagnostics.report(v) { text ->
+                unblockReport = text
+                showReport = true
+                status = "Prüfbericht erstellt. Antippen, um ihn erneut zu sehen."
+            }
+        }
+    }
 
     fun fill(view: WebView, auto: Boolean = false) {
         status = "Formular wird ausgefüllt …"
-        filler.fill(view, auto) { result -> status = result }
+        filler.fill(view, auto, withPhotos = fillPhotos) { result -> status = result }
     }
 
     Scaffold(
@@ -93,6 +116,50 @@ fun PostScreen(vm: ListingViewModel) {
                     IconButton(onClick = { webView?.let { fill(it) } }) {
                         Icon(Icons.Filled.AutoFixHigh, contentDescription = "Erneut ausfüllen")
                     }
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "Weitere Optionen")
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Prüfbericht (wenn Tippen nicht geht)") },
+                            onClick = { menuOpen = false; showDiagnostics() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Neu laden ohne Ausfüllen") },
+                            onClick = {
+                                menuOpen = false
+                                autoFill = false
+                                fillPhotos = true
+                                webView?.loadUrl(KleinanzeigenWebFiller.POST_URL)
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Neu laden, ausfüllen ohne Fotos") },
+                            onClick = {
+                                menuOpen = false
+                                autoFill = true
+                                fillPhotos = false
+                                webView?.loadUrl(KleinanzeigenWebFiller.POST_URL)
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Neu laden und alles ausfüllen") },
+                            onClick = {
+                                menuOpen = false
+                                autoFill = true
+                                fillPhotos = true
+                                webView?.loadUrl(KleinanzeigenWebFiller.POST_URL)
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Im Browser öffnen (Text wird kopiert)") },
+                            onClick = {
+                                menuOpen = false
+                                KleinanzeigenHandoff.copyToClipboard(context, "Anzeige", draft.asShareText())
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(KleinanzeigenWebFiller.POST_URL)))
+                            },
+                        )
+                    }
                 },
             )
         },
@@ -119,9 +186,15 @@ fun PostScreen(vm: ListingViewModel) {
                         settings.loadWithOverviewMode = true
                         settings.builtInZoomControls = true
                         settings.displayZoomControls = false
+                        diagnostics.attach(this)
                         webChromeClient = object : WebChromeClient() {
                             override fun onProgressChanged(view: WebView, newProgress: Int) {
                                 progress = newProgress
+                            }
+
+                            override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
+                                diagnostics.onConsole(consoleMessage)
+                                return super.onConsoleMessage(consoleMessage)
                             }
                         }
                         webViewClient = object : WebViewClient() {
@@ -133,11 +206,14 @@ fun PostScreen(vm: ListingViewModel) {
 
                             override fun onPageFinished(view: WebView, url: String) {
                                 CookieManager.getInstance().flush()
+                                diagnostics.ensureTrace(view)
                                 status = when {
                                     KleinanzeigenWebFiller.isConfirmation(url) -> {
                                         vm.setPublished(true)
                                         "Veröffentlicht und unter „Meine Anzeigen“ vermerkt. Mit dem Pfeil oben geht es zurück."
                                     }
+                                    KleinanzeigenWebFiller.isPostingForm(url) && !autoFill ->
+                                        "Ohne Ausfüllen geladen (Gegenprobe). Lässt sich jetzt etwas antippen?"
                                     KleinanzeigenWebFiller.isPostingForm(url) -> {
                                         fill(view, auto = true)
                                         "Formular wird ausgefüllt …"

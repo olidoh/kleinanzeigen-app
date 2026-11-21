@@ -33,10 +33,10 @@ class KleinanzeigenWebFiller(
      * [auto] = vom Laden der Seite ausgelöst: dann nur einmal je Seite ausfüllen, damit spätere
      * Seitenereignisse (z. B. die Kategorie-Auswahl) nicht erneut alles überschreiben.
      */
-    fun fill(view: WebView, auto: Boolean = false, onResult: (String) -> Unit) {
+    fun fill(view: WebView, auto: Boolean = false, withPhotos: Boolean = true, onResult: (String) -> Unit) {
         // Fotos im Hintergrund verkleinern (Upload-Limit 12 MB je Bild, kleinere Dateien laden schneller).
         io.execute {
-            val encoded = photos.take(MAX_PHOTOS).mapNotNull { file ->
+            val encoded = photos.take(if (withPhotos) MAX_PHOTOS else 0).mapNotNull { file ->
                 runCatching { Base64.encodeToString(ImagePreparer.jpeg(file, UPLOAD_EDGE), Base64.NO_WRAP) }.getOrNull()
             }
             main.post { inject(view, encoded, auto, onResult) }
