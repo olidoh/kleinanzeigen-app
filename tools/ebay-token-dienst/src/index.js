@@ -1,4 +1,4 @@
-// Token-Dienst für die eBay-Anmeldung des Inserat-Helfers.
+// Token-Dienst für die eBay-Anmeldung von Verkora.
 //
 // eBay verlangt beim Eintausch des Anmeldecodes das Client Secret der Anwendung. Eine App kann das
 // nicht geheim halten, deshalb liegt es nur hier (als Cloudflare-Secret). Der Dienst speichert nichts:
@@ -39,7 +39,7 @@ export default {
         case "GET /datenschutz":
           return page(
             "Datenschutz",
-            "Der Inserat-Helfer ist eine Android-App. Dieser Dienst tauscht nur den Anmeldecode von eBay gegen " +
+            "Verkora ist eine Android-App. Dieser Dienst tauscht nur den Anmeldecode von eBay gegen " +
               "einen Zugangsschlüssel und gibt ihn an die App auf deinem Handy zurück. Er speichert weder " +
               "Zugangsschlüssel noch Anzeigen oder andere Daten. Die Zugangsschlüssel liegen verschlüsselt nur " +
               "auf deinem Handy. Abmelden kannst du dich jederzeit in der App oder bei eBay unter " +

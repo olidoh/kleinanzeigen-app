@@ -66,7 +66,7 @@ fun EbayLoginScreen(vm: ListingViewModel) {
             Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
                 Text(
                     flow.loginError ?: if (flow.loginBusy) "Anmeldung wird abgeschlossen …"
-                    else "Melde dich mit deinem eBay-Konto an und erlaube dem Inserat-Helfer, Angebote für dich einzustellen.",
+                    else "Melde dich mit deinem eBay-Konto an und erlaube Verkora, Angebote für dich einzustellen.",
                     style = MaterialTheme.typography.bodySmall,
                     color = if (flow.loginError != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.padding(12.dp),

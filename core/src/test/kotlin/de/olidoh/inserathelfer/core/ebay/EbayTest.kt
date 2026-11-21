@@ -141,7 +141,7 @@ class EbayTest {
         sku = "abc-1", title = "Fahrrad", description = "Gut erhalten", priceEur = 120, bestOffer = true,
         categoryId = "177831", conditionEnum = "USED_GOOD", conditionNote = "Zustand: Gut",
         aspects = mapOf("Marke" to "Cube", "Farbe" to ""), imageUrls = listOf("https://i.ebayimg.com/1.jpg"),
-        fulfillmentPolicyId = "f1", paymentPolicyId = "p1", returnPolicyId = "r1", locationKey = "inserathelfer-10115",
+        fulfillmentPolicyId = "f1", paymentPolicyId = "p1", returnPolicyId = "r1", locationKey = "verkora-10115",
     )
 
     @Test

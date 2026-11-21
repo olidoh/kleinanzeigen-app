@@ -1,6 +1,6 @@
-# Cloudflare Worker für die eBay-Anmeldung des Inserat-Helfers.
+# Cloudflare Worker für die eBay-Anmeldung von Verkora.
 # Einrichtung: docs/eBay-Einrichtung.md
-name = "inserathelfer-ebay"
+name = "verkora-ebay"
 main = "src/index.js"
 compatibility_date = "2026-11-01"
 

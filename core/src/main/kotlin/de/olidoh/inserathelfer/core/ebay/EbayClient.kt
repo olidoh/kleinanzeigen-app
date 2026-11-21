@@ -147,7 +147,7 @@ class EbayClient(
     fun ensureLocation(postalCode: String, city: String): String {
         val plz = postalCode.filter(Char::isDigit)
         if (plz.length != 5) throw EbayException("Bitte eine gültige deutsche Postleitzahl angeben.")
-        val key = "inserathelfer-$plz"
+        val key = "verkora-$plz"
         val url = "$apiHost/sell/inventory/v1/location/$key"
         val exists = try {
             get(url)
@@ -158,7 +158,7 @@ class EbayClient(
         if (!exists) {
             val body = EbayAuth.mapper.writeValueAsString(
                 mapOf(
-                    "name" to "Inserat-Helfer $plz",
+                    "name" to "Verkora $plz",
                     "locationTypes" to listOf("WAREHOUSE"),
                     "merchantLocationStatus" to "ENABLED",
                     "location" to mapOf(

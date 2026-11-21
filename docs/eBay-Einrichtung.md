@@ -1,6 +1,6 @@
 # eBay-Anbindung einrichten
 
-Damit der Inserat-Helfer Anzeigen bei ebay.de einstellen kann, braucht es einmalig drei Dinge:
+Damit Verkora Anzeigen bei ebay.de einstellen kann, braucht es einmalig drei Dinge:
 
 1. ein **eBay-Entwicklerkonto** mit einer Anwendung („Keyset“),
 2. den kleinen **Token-Dienst** bei Cloudflare (kostenlos), der das geheime eBay-Schlüsselteil verwahrt,
@@ -48,11 +48,11 @@ Deletion). Der Token-Dienst hat ihn schon eingebaut, er braucht dafür ein selbs
 
 1. Kostenloses Konto anlegen: <https://dash.cloudflare.com/sign-up>.
 2. Links **Compute (Workers) > Workers & Pages** öffnen, dann **Create** > **Start with Hello World!**.
-3. Als Namen `inserathelfer-ebay` eingeben und **Deploy** drücken.
+3. Als Namen `verkora-ebay` eingeben und **Deploy** drücken.
 4. **Edit code** öffnen, den gesamten Inhalt durch die Datei
    [`tools/ebay-token-dienst/src/index.js`](../tools/ebay-token-dienst/src/index.js) aus diesem Repo ersetzen
    und **Deploy** drücken.
-5. Die Adresse des Workers notieren, sie sieht so aus: `https://inserathelfer-ebay.<dein-name>.workers.dev`.
+5. Die Adresse des Workers notieren, sie sieht so aus: `https://verkora-ebay.<dein-name>.workers.dev`.
    Kurzer Test: `…workers.dev/eingeloggt` im Browser öffnen, es erscheint „Bei eBay angemeldet“.
 6. Im Worker unter **Settings > Variables and Secrets** hinzufügen:
 
@@ -68,9 +68,9 @@ Secrets mit `npx wrangler secret put <NAME>` setzen (siehe `wrangler.toml`).
 ## Schritt 4: Produktiv-Schlüssel bei eBay erzeugen
 
 1. Im Entwicklerportal oben rechts auf deinen Namen > **Application Keysets**.
-2. Bei **Production** einen Namen eingeben (z. B. `InseratHelfer`) und **Create a keyset** wählen.
+2. Bei **Production** einen Namen eingeben (z. B. `Verkora`) und **Create a keyset** wählen.
 3. eBay fragt nun nach den Meldungen zu gelöschten Konten (**Marketplace Account Deletion**). Dort eintragen:
-   - **Notification Endpoint:** `https://inserathelfer-ebay.<dein-name>.workers.dev/konto-loeschung`
+   - **Notification Endpoint:** `https://verkora-ebay.<dein-name>.workers.dev/konto-loeschung`
    - **Verification token:** das Kennwort aus Schritt 2
    - Speichern. eBay prüft den Endpunkt sofort; es muss ein grünes Häkchen erscheinen.
      Klappt das nicht: Schritt 3.6 prüfen (Secret gesetzt und Worker neu bereitgestellt?).
@@ -84,10 +84,10 @@ Secrets mit `npx wrangler secret put <NAME>` setzen (siehe `wrangler.toml`).
 1. Beim Production-Keyset auf **User Tokens** klicken.
 2. **Get a Token from eBay via Your Application** > **Add eBay Redirect URL**.
 3. Ausfüllen:
-   - **Display title:** `Inserat-Helfer` (sehen Nutzer bei der Zustimmung)
-   - **Privacy policy URL:** `https://inserathelfer-ebay.<dein-name>.workers.dev/datenschutz`
-   - **Auth accepted URL:** `https://inserathelfer-ebay.<dein-name>.workers.dev/eingeloggt`
-   - **Auth declined URL:** `https://inserathelfer-ebay.<dein-name>.workers.dev/abgelehnt`
+   - **Display title:** `Verkora` (sehen Nutzer bei der Zustimmung)
+   - **Privacy policy URL:** `https://verkora-ebay.<dein-name>.workers.dev/datenschutz`
+   - **Auth accepted URL:** `https://verkora-ebay.<dein-name>.workers.dev/eingeloggt`
+   - **Auth declined URL:** `https://verkora-ebay.<dein-name>.workers.dev/abgelehnt`
    - Als Verfahren **OAuth** wählen (nicht „Auth'n'Auth“).
 4. Speichern. In der Zeile steht jetzt der **RuName** (eBay Redirect URL name), etwa
    `Oliver_Dohrenbu-InseratH-PRD-1a2b3c4d5-abcdef12`. Diesen Wert notieren.
@@ -110,7 +110,7 @@ und stehen später ohnehin in der App) drei Variablen anlegen:
 |---|---|
 | `EBAY_CLIENT_ID` | App ID (Client ID) |
 | `EBAY_RUNAME` | RuName |
-| `EBAY_TOKEN_SERVICE_URL` | `https://inserathelfer-ebay.<dein-name>.workers.dev` |
+| `EBAY_TOKEN_SERVICE_URL` | `https://verkora-ebay.<dein-name>.workers.dev` |
 
 Danach einen neuen Build anstoßen (z. B. im Tab **Actions** > Build > **Run workflow**) und die neue APK installieren.
 Ohne die Variablen lässt sich die eBay-Anbindung testweise auch in der App unter
