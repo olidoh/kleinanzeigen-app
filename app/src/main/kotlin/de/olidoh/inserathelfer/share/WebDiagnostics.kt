@@ -125,6 +125,11 @@ class WebDiagnostics {
               };
               const out = {};
               out.adresse = location.pathname + location.hash;
+              const vhProbe = document.createElement('div');
+              vhProbe.style.cssText = 'position:absolute;top:0;left:-9999px;width:1px;height:100vh;visibility:hidden';
+              document.body.appendChild(vhProbe);
+              out.vh = '100vh = ' + Math.round(vhProbe.getBoundingClientRect().height) + 'px, innerHeight = ' + innerHeight + 'px';
+              vhProbe.remove();
               out.zustand = document.readyState + ', Fenster ' + innerWidth + 'x' + innerHeight + ', Scroll ' + Math.round(scrollY);
               const islands = document.querySelectorAll('astro-island');
               out.hydriert = islands.length + ' Inseln, davon noch nicht aktiv: ' + document.querySelectorAll('astro-island[ssr]').length;

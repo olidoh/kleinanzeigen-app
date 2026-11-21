@@ -2,6 +2,7 @@ package de.olidoh.inserathelfer.ui
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.view.ViewGroup
 import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
 import androidx.compose.material.icons.filled.MoreVert
@@ -168,6 +169,10 @@ fun PostScreen(vm: ListingViewModel) {
                 modifier = Modifier.fillMaxSize(),
                 factory = { context ->
                     WebView(context).apply {
+                        // Wichtig: AndroidView gibt Views sonst WRAP_CONTENT. Damit läuft die WebView im
+                        // „Wrap-Content-Modus“, in dem CSS-vh-Einheiten 0 werden: Dialoge mit max-h-[90vh]
+                        // (Cookie-Hinweis, Versandmethoden) fallen auf Höhe 0 zusammen.
+                        layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                         CookieManager.getInstance().setAcceptCookie(true)
                         CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                         settings.javaScriptEnabled = true

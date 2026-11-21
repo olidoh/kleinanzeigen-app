@@ -86,7 +86,7 @@ class KleinanzeigenWebFiller(
         if (obj.optBoolean("skipped")) return "Formular ist bereits ausgefüllt. Neu ausfüllen über das Zauberstab-Symbol oben."
         val missing = obj.optJSONArray("missing")?.let { arr -> List(arr.length()) { arr.getString(it) } }.orEmpty()
         return if (missing.isEmpty()) {
-            "Alles ausgefüllt. Bitte prüfen und unten auf „Anzeige aufgeben“ tippen. Ist die Seite grau, oben auf das Schloss tippen."
+            "Ausgefüllt. Bitte noch Versand wählen, alles prüfen und unten auf „Anzeige aufgeben“ tippen."
         } else {
             val categoryHint = if (missing.any { it.startsWith("Kategorie") }) {
                 "Bei Kategorie auf „Wähle deine Kategorie“ tippen, Vorschlag: ${draft.category}. "
@@ -278,7 +278,7 @@ class KleinanzeigenWebFiller(
                       if (pseudoOverlay(a) && !a.hasAttribute('data-ih-nopseudo')) { a.setAttribute('data-ih-nopseudo', '1'); fixed.push('Schleier (::before/::after) entfernt: ' + desc(a)); done = true; }
                     }
                     relax(probe);
-                    if (!done) { probe.style.setProperty('pointer-events', 'auto', 'important'); probe.style.setProperty('position', 'relative'); probe.style.setProperty('z-index', '2147483647'); fixed.push('Feld nach vorne geholt: ' + name); }
+                    if (!done) { report.push('Treffer-Test ' + name + ': Ursache unklar, nichts verändert'); break; }
                   } else {
                     // Fremdes Element liegt darüber: obersten Vorfahren entfernen, der das Formular nicht enthält
                     let overlay = top;
@@ -305,7 +305,7 @@ class KleinanzeigenWebFiller(
          * Läuft in der Seite. Setzt Werte so, dass das React-Formular sie übernimmt
          * (nativer Setter plus input/change-Events), und legt das Ergebnis in window.__ihResult ab.
          */
-        private val FILL_SCRIPT get() = FILL_TEMPLATE.replace("__UNBLOCK__", UNBLOCK_SCRIPT).replace("__CONSENT__", CONSENT_HELPERS)
+        private val FILL_SCRIPT get() = FILL_TEMPLATE.replace("__CONSENT__", CONSENT_HELPERS)
 
         private val FILL_TEMPLATE = """
             async function (d) {
@@ -330,14 +330,21 @@ class KleinanzeigenWebFiller(
                 el.click();
               };
               __CONSENT__
-              const unblock = (__UNBLOCK__);
+              // Nur eine offen gebliebene Auswahlliste schließen; sonst nichts an der Seite verändern.
+              const closeListbox = async () => {
+                const open = Array.from(document.querySelectorAll('[role="listbox"]')).some(l => l.getBoundingClientRect().height > 0);
+                if (!open) return;
+                const t = document.activeElement || document.body;
+                ['keydown', 'keyup'].forEach(type => t.dispatchEvent(new KeyboardEvent(type, { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true, cancelable: true })));
+                await sleep(200);
+              };
               async function pickOption(combo, label) {
                 realClick(combo);
                 const opt = await waitFor(() => Array.from(document.querySelectorAll('[role="option"]'))
                   .find(o => norm(o.textContent) === norm(label)), 3000);
                 if (opt) realClick(opt);
                 await sleep(300);
-                await unblock();
+                await closeListbox();
                 return !!opt;
               }
               // Kategorie-Vorschläge von Kleinanzeigen: passendsten anklicken (Wortüberlappung mit dem KI-Vorschlag).
@@ -421,7 +428,7 @@ class KleinanzeigenWebFiller(
                     if (!(await pickOption(combo, d.condition))) missing.push('Zustand (' + d.condition + ')');
                   }
                 }
-                await unblock();
+                await closeListbox();
                 // Keine Kategorie: erst jetzt die Kategorie-Auswahl der Seite öffnen, damit der Nutzer direkt wählen kann.
                 if (!category) {
                   const box = document.getElementById('ad-category-suggestions');
@@ -431,7 +438,7 @@ class KleinanzeigenWebFiller(
                 }
                 window.__ihResult = { missing };
               } catch (e) {
-                try { await unblock(); } catch (_) {}
+                try { await closeListbox(); } catch (_) {}
                 window.__ihResult = { missing: ['Fehler beim Ausfüllen: ' + e.message] };
               }
             }
