@@ -50,9 +50,9 @@ fun PostScreen(vm: ListingViewModel) {
     var webView by remember { mutableStateOf<WebView?>(null) }
     val filler = remember(draft) { KleinanzeigenWebFiller(draft, vm.photos.toList()) }
 
-    fun fill(view: WebView) {
+    fun fill(view: WebView, auto: Boolean = false) {
         status = "Formular wird ausgefüllt …"
-        filler.fill(view) { result -> status = result }
+        filler.fill(view, auto) { result -> status = result }
     }
 
     Scaffold(
@@ -65,7 +65,7 @@ fun PostScreen(vm: ListingViewModel) {
                     }
                 },
                 actions = {
-                    IconButton(onClick = { webView?.let(::fill) }) {
+                    IconButton(onClick = { webView?.let { fill(it) } }) {
                         Icon(Icons.Filled.AutoFixHigh, contentDescription = "Erneut ausfüllen")
                     }
                 },
@@ -111,7 +111,7 @@ fun PostScreen(vm: ListingViewModel) {
                                         "Veröffentlicht und unter „Meine Anzeigen“ vermerkt. Mit dem Pfeil oben geht es zurück."
                                     }
                                     KleinanzeigenWebFiller.isPostingForm(url) -> {
-                                        fill(view)
+                                        fill(view, auto = true)
                                         "Formular wird ausgefüllt …"
                                     }
                                     KleinanzeigenWebFiller.isLogin(url) ->

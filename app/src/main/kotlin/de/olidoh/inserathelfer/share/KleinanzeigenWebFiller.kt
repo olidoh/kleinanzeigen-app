@@ -29,17 +29,21 @@ class KleinanzeigenWebFiller(
     private val main = Handler(Looper.getMainLooper())
     private val io = Executors.newSingleThreadExecutor()
 
-    fun fill(view: WebView, onResult: (String) -> Unit) {
+    /**
+     * [auto] = vom Laden der Seite ausgelöst: dann nur einmal je Seite ausfüllen, damit spätere
+     * Seitenereignisse (z. B. die Kategorie-Auswahl) nicht erneut alles überschreiben.
+     */
+    fun fill(view: WebView, auto: Boolean = false, onResult: (String) -> Unit) {
         // Fotos im Hintergrund verkleinern (Upload-Limit 12 MB je Bild, kleinere Dateien laden schneller).
         io.execute {
             val encoded = photos.take(MAX_PHOTOS).mapNotNull { file ->
                 runCatching { Base64.encodeToString(ImagePreparer.jpeg(file, UPLOAD_EDGE), Base64.NO_WRAP) }.getOrNull()
             }
-            main.post { inject(view, encoded, onResult) }
+            main.post { inject(view, encoded, auto, onResult) }
         }
     }
 
-    private fun inject(view: WebView, photosBase64: List<String>, onResult: (String) -> Unit) {
+    private fun inject(view: WebView, photosBase64: List<String>, auto: Boolean, onResult: (String) -> Unit) {
         // Fotos einzeln übergeben, damit kein riesiger Skript-String entsteht.
         view.evaluateJavascript("window.__ihPhotos = []; window.__ihResult = null;", null)
         photosBase64.forEach { b64 ->
@@ -51,6 +55,8 @@ class KleinanzeigenWebFiller(
             .put("price", if (draft.priceType == PriceType.FREE) "" else draft.priceEur.toString())
             .put("priceType", draft.priceType.label)
             .put("condition", draft.condition)
+            .put("category", draft.category)
+            .put("auto", auto)
         view.evaluateJavascript("($FILL_SCRIPT)($payload);", null)
         poll(view, attempts = 0, onResult = onResult)
     }
@@ -71,12 +77,18 @@ class KleinanzeigenWebFiller(
         // evaluateJavascript liefert einen JSON-String, der selbst JSON enthält.
         val obj = runCatching { JSONObject(JSONArray("[$rawJson]").getString(0)) }.getOrNull()
             ?: return "Formular ausgefüllt. Bitte prüfen und auf „Anzeige aufgeben“ tippen."
+        if (obj.optBoolean("skipped")) return "Formular ist bereits ausgefüllt. Neu ausfüllen über das Zauberstab-Symbol oben."
         val missing = obj.optJSONArray("missing")?.let { arr -> List(arr.length()) { arr.getString(it) } }.orEmpty()
         return if (missing.isEmpty()) {
             "Alles ausgefüllt. Bitte prüfen und unten auf „Anzeige aufgeben“ tippen."
         } else {
-            "Ausgefüllt, bitte noch selbst ergänzen: ${missing.joinToString(", ")}. " +
-                "Vorschlag Kategorie: ${draft.category}. Dann auf „Anzeige aufgeben“ tippen."
+            val categoryHint = if (missing.any { it.startsWith("Kategorie") }) {
+                "Bei Kategorie auf „Wähle deine Kategorie“ tippen, Vorschlag: ${draft.category}. "
+            } else {
+                ""
+            }
+            "Ausgefüllt, bitte noch selbst ergänzen: ${missing.joinToString(", ")}. $categoryHint" +
+                "Dann auf „Anzeige aufgeben“ tippen."
         }
     }
 
@@ -119,7 +131,31 @@ class KleinanzeigenWebFiller(
                 combo.click();
                 return false;
               }
+              // Kategorie-Vorschläge von Kleinanzeigen: passendsten anklicken (Wortüberlappung mit dem KI-Vorschlag).
+              async function pickSuggestedCategory(wanted) {
+                const box = document.getElementById('ad-category-suggestions');
+                if (!box) return false;
+                const isPicker = (el) => norm(el.textContent).startsWith('wähle deine kategorie');
+                const candidates = await waitFor(() => {
+                  const list = Array.from(box.querySelectorAll('button, a, [role="radio"], [role="option"], input[type="radio"], label'))
+                    .filter(el => !isPicker(el) && norm(el.textContent || el.value).length > 1);
+                  return list.length ? list : null;
+                }, 4000);
+                if (candidates) {
+                  const words = norm(wanted).split(/[^a-zäöüß0-9]+/).filter(w => w.length > 2);
+                  const score = (el) => words.filter(w => norm(el.textContent || el.value).includes(w)).length;
+                  const best = candidates.slice().sort((a, b) => score(b) - score(a))[0];
+                  best.click();
+                  if (await waitFor(() => { const c = document.querySelector('input[name="categoryId"]'); return c && c.value; }, 3000)) return true;
+                }
+                // Kein Vorschlag: Kategorie-Auswahl der Seite öffnen, damit der Nutzer direkt wählen kann.
+                const picker = Array.from(box.querySelectorAll('a, button')).find(isPicker);
+                if (picker) picker.click();
+                return false;
+              }
               try {
+                if (d.auto && window.__ihFilledOnce) { window.__ihResult = { skipped: true, missing: [] }; return; }
+                window.__ihFilledOnce = true;
                 const form = await waitFor(() => document.getElementById('ad-title'), 10000);
                 if (!form) { window.__ihResult = { missing: ['Formular nicht gefunden (Seite geändert?)'] }; return; }
 
@@ -137,12 +173,14 @@ class KleinanzeigenWebFiller(
                 } else if ((window.__ihPhotos || []).length) { missing.push('Fotos'); }
                 window.__ihPhotos = [];
 
-                // Titel, danach wählt Kleinanzeigen die Kategorie selbst
+                // Titel, danach schlägt Kleinanzeigen beim Verlassen des Feldes Kategorien vor
                 const title = document.getElementById('ad-title');
                 title.focus(); setValue(title, d.title); title.blur();
-                const category = await waitFor(() => {
-                  const c = document.querySelector('input[name="categoryId"]'); return c && c.value ? c : null;
-                }, 6000);
+                title.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+                const categoryInput = () => document.querySelector('input[name="categoryId"]');
+                const hasCategory = () => { const c = categoryInput(); return !!(c && c.value); };
+                let category = await waitFor(hasCategory, 4000);
+                if (!category) category = await pickSuggestedCategory(d.category);
                 if (!category) missing.push('Kategorie');
 
                 const desc = await waitFor(() => document.getElementById('ad-description'), 3000);
