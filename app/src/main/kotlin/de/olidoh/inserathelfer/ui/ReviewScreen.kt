@@ -157,7 +157,7 @@ fun ReviewScreen(vm: ListingViewModel) {
                         KleinanzeigenHandoff.Result.SHARED_TO_APP ->
                             "Text ist in der Zwischenablage. In Kleinanzeigen einfügen und veröffentlichen."
                         KleinanzeigenHandoff.Result.OPENED_APP_PHOTOS_IN_GALLERY ->
-                            "Fotos liegen in der Galerie (Inserat-Helfer), der Text in der Zwischenablage."
+                            "Fotos liegen in der Galerie (Verkora), der Text in der Zwischenablage."
                         KleinanzeigenHandoff.Result.APP_NOT_INSTALLED ->
                             "Bitte zuerst die Kleinanzeigen-App installieren. Der Text ist kopiert."
                     }

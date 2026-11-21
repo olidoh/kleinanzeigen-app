@@ -15,11 +15,12 @@ if (releaseRequested && sharedKeystore == null) {
 }
 
 android {
+    // Interner Code-Namensraum (nicht sichtbar), bleibt aus der Zeit als „Inserat-Helfer“.
     namespace = "de.olidoh.inserathelfer"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "de.olidoh.inserathelfer"
+        applicationId = "de.olidoh.verkora"
         // Android 10+: Fotos lassen sich ohne Speicher-Berechtigung in die Galerie legen.
         minSdk = 29
         targetSdk = 36

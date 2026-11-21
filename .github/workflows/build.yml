@@ -21,8 +21,8 @@ jobs:
           KEYSTORE_B64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
         run: |
           if [ -n "$KEYSTORE_B64" ]; then
-            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/inserathelfer.jks"
-            echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/inserathelfer.jks" >> "$GITHUB_ENV"
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/signing.jks"
+            echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/signing.jks" >> "$GITHUB_ENV"
           else
             echo "::warning::Kein Secret SIGNING_KEYSTORE_BASE64: APK wird mit wechselndem Debug-Schlüssel signiert und lässt sich nicht drüber installieren."
           fi
@@ -32,7 +32,7 @@ jobs:
         run: ./gradlew --no-daemon :core:test :app:assembleStoreDebug
       - uses: actions/upload-artifact@v7
         with:
-          name: inserat-helfer-${{ github.run_number }}-apk
+          name: verkora-${{ github.run_number }}-apk
           path: app/build/outputs/apk/store/debug/*.apk
       # Probelauf fuer die Intune-Version (ohne Upload): zeigt frueh, ob Release-Build und Signatur passen.
       - name: Intune-Release-APK probeweise bauen
@@ -52,5 +52,5 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: env.SIGNING_KEYSTORE_PATH != ''
         with:
-          name: inserat-helfer-intern-release-${{ github.run_number }}
+          name: verkora-intern-release-${{ github.run_number }}
           path: app/build/outputs/apk/intern/release/app-intern-release.apk

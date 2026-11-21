@@ -1,23 +1,24 @@
-# Inserat-Helfer über Intune verteilen (private App, Managed Google Play)
+# Verkora über Intune verteilen (private App, Managed Google Play)
 
-Aufbau wie bei easyTDD: Die interne App `de.olidoh.inserathelfer.intern` wird über den GitHub-Workflow
+Aufbau wie bei easyTDD: Die interne App `de.olidoh.verkora.intern` wird über den GitHub-Workflow
 `.github/workflows/release-intern.yml` veröffentlicht. Er baut, prüft Signatur, Paketname und versionCode,
 lädt das APK zu Managed Google Play hoch (Intune holt die App von dort) und legt es zusätzlich als
 GitHub-Release ab.
 
 | Variante | Paketname | Zweck |
 |---|---|---|
-| `intern` | `de.olidoh.inserathelfer.intern` | Intune / Managed Google Play, private App (Release, fester Schlüssel) |
-| `store` | `de.olidoh.inserathelfer` | bisherige Test-APKs aus der CI, spätere öffentliche Veröffentlichung |
+| `intern` | `de.olidoh.verkora.intern` | Intune / Managed Google Play, private App (Release, fester Schlüssel) |
+| `store` | `de.olidoh.verkora` | bisherige Test-APKs aus der CI, spätere öffentliche Veröffentlichung |
 
 Die beiden Varianten sind für Android zwei verschiedene Apps und können nebeneinander installiert sein.
-Die Anzeigen-Historie und die KI-Schlüssel der Test-APK werden nicht übernommen.
+Die Anzeigen-Historie und die KI-Schlüssel der Test-APK werden nicht übernommen. Seit der Umbenennung in
+„Verkora“ heißt auch die Test-APK anders (`de.olidoh.verkora`); die alte `de.olidoh.inserathelfer` kann gelöscht werden.
 
 ## Feste Werte – niemals ändern
 
 | Was | Wert |
 |---|---|
-| Paketname | `de.olidoh.inserathelfer.intern` (Variante `intern`) |
+| Paketname | `de.olidoh.verkora.intern` (Variante `intern`) |
 | Signierschlüssel | Alias `inserathelfer`, CN=Inserat-Helfer, gültig bis 2054 (GitHub-Secrets, Sicherung außerhalb des Repos) |
 | Zertifikat SHA-256 | `7C:71:71:FC:A3:38:12:F5:CF:36:FB:63:48:86:05:32:CB:99:26:7F:16:3C:F2:36:3E:F4:A2:3B:8C:A6:EE:EC` |
 | Play App Signing | **nicht einschalten** – sonst passen Play-Version und Direkt-APK nicht mehr zusammen |
@@ -35,14 +36,14 @@ Das Repo ist öffentlich: Keystore, Passwort und Dienstkonto-JSON **nie** ins Re
    | `PLAY_SERVICE_ACCOUNT_JSON` | kompletter Inhalt der JSON-Datei des Play-Dienstkontos (dasselbe wie bei easyTDD) |
 
 2. **Erstes APK holen:** Nach dem nächsten grünen Lauf des Workflows *Build* liegt unter den Artefakten
-   `inserat-helfer-intern-release-<Nr>` (Version 1.0.0, versionCode 100, fester Schlüssel).
+   `verkora-intern-release-<Nr>` (Version 1.0.0, versionCode 100, fester Schlüssel).
 3. **Private App in Intune anlegen** (einmalig von Hand, Google legt die App dabei an):
    Intune Admin Center › *Apps › Android › Hinzufügen* › **Managed Google Play-App** › *Private Apps* (Schloss) › **+**,
-   Titel `Inserat-Helfer`, APK hochladen › *Erstellen*. Nach einigen Minuten (bis zu einer Stunde) die App
+   Titel `Verkora`, APK hochladen › *Erstellen*. Nach einigen Minuten (bis zu einer Stunde) die App
    **Genehmigen** (Kamera, Internet), in Intune **Synchronisieren** und unter *Eigenschaften › Zuweisungen*
    Gruppen zuweisen (Erforderlich oder Verfügbar).
 4. **Dienstkonto freischalten:** Play Console (dasselbe Entwicklerkonto wie easyTDD) › *Nutzer und Berechtigungen* ›
-   Dienstkonto `play-upload@…` › Berechtigungen für die App *Inserat-Helfer* hinzufügen (Releases verwalten,
+   Dienstkonto `play-upload@…` › Berechtigungen für die App *Verkora* hinzufügen (Releases verwalten,
    auch für Produktion). Wirkt teils erst nach einigen Stunden.
 
 ## Ablauf „neue Version veröffentlichen“

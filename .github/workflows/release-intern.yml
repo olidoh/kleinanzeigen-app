@@ -1,4 +1,4 @@
-# Inserat-Helfer intern: bauen, Signatur pruefen, zu Managed Google Play hochladen, APK als GitHub-Release ablegen.
+# Verkora intern: bauen, Signatur pruefen, zu Managed Google Play hochladen, APK als GitHub-Release ablegen.
 # Aufbau wie bei easyTDD. Ausloesen: Actions > "Run workflow" auf main (auch per API) oder Tag "v<versionName>" pushen.
 # Beim Lauf ueber "Run workflow" mit Upload auf production legt der Workflow Tag und GitHub-Release selbst an.
 # Ablauf und Regeln: docs/Veroeffentlichung.md
@@ -27,7 +27,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PACKAGE_NAME: de.olidoh.inserathelfer.intern
+  PACKAGE_NAME: de.olidoh.verkora.intern
   # SHA-256 des festen Signierschluessels (Alias inserathelfer, CN=Inserat-Helfer, gueltig bis 2054). NIE aendern.
   # Weicht der Build davon ab, bricht der Workflow ab: andere Signatur = kein Update moeglich.
   EXPECTED_CERT_SHA256: 7c7171fca33812f5cf36fb6348860532cb99267f163cf2363ef4a23b8ca6eeec
@@ -83,8 +83,8 @@ jobs:
         env:
           SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
         run: |
-          echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/inserathelfer.jks"
-          echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/inserathelfer.jks" >> "$GITHUB_ENV"
+          echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/signing.jks"
+          echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/signing.jks" >> "$GITHUB_ENV"
 
       - name: Tests und Release-APK bauen
         env:
@@ -117,7 +117,7 @@ jobs:
           echo "$badging"
           echo "$badging" | grep -q "package: name='$PACKAGE_NAME'" || { echo "::error::Falscher Paketname"; exit 1; }
           echo "$badging" | grep -q "versionCode='${{ steps.ver.outputs.code }}'" || { echo "::error::versionCode im APK passt nicht"; exit 1; }
-          ziel="Inserat-Helfer-intern-${{ steps.ver.outputs.name }}.apk"
+          ziel="Verkora-intern-${{ steps.ver.outputs.name }}.apk"
           cp "$apk" "$ziel"
           echo "file=$ziel" >> "$GITHUB_OUTPUT"
           echo "Signatur OK ($ist)"
@@ -148,9 +148,9 @@ jobs:
         run: |
           gh release create "v${{ steps.ver.outputs.name }}" "${{ steps.apk.outputs.file }}" \
             --target "$GITHUB_SHA" \
-            --title "Inserat-Helfer intern ${{ steps.ver.outputs.name }} (${{ steps.ver.outputs.code }})" \
+            --title "Verkora intern ${{ steps.ver.outputs.name }} (${{ steps.ver.outputs.code }})" \
             --notes "Signatur SHA-256: $EXPECTED_CERT_SHA256 – identisch mit der Version aus Managed Google Play."
 
       - name: Aufraeumen
         if: always()
-        run: rm -f "$RUNNER_TEMP/inserathelfer.jks"
+        run: rm -f "$RUNNER_TEMP/signing.jks"

@@ -1,4 +1,4 @@
-"""Laedt ein signiertes APK (Inserat-Helfer, uebernommen aus easyTDD) ueber die Google Play Developer API hoch und gibt es auf einem Track frei.
+"""Laedt ein signiertes APK (Verkora, uebernommen aus easyTDD) ueber die Google Play Developer API hoch und gibt es auf einem Track frei.
 
 Anmeldung: Dienstkonto-JSON in der Umgebungsvariable PLAY_SERVICE_ACCOUNT_JSON (GitHub-Secret).
 Bricht ab, wenn der versionCode nicht hoeher ist als alles, was bereits bei Google Play liegt.
