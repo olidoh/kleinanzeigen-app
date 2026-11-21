@@ -29,8 +29,23 @@ jobs:
       - name: Tests und Debug-APK bauen
         env:
           SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
-        run: ./gradlew --no-daemon :core:test :app:assembleDebug
+        run: ./gradlew --no-daemon :core:test :app:assembleStoreDebug
       - uses: actions/upload-artifact@v7
         with:
           name: inserat-helfer-${{ github.run_number }}-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/store/debug/*.apk
+      # Probelauf fuer die Intune-Version (ohne Upload): zeigt frueh, ob Release-Build und Signatur passen.
+      - name: Intune-Release-APK probeweise bauen
+        if: env.SIGNING_KEYSTORE_PATH != ''
+        env:
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+        run: |
+          ./gradlew --no-daemon :app:assembleInternRelease
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$bt/apksigner" verify --print-certs app/build/outputs/apk/intern/release/app-intern-release.apk | grep 'SHA-256'
+          "$bt/aapt2" dump badging app/build/outputs/apk/intern/release/app-intern-release.apk | head -1
+      - uses: actions/upload-artifact@v7
+        if: env.SIGNING_KEYSTORE_PATH != ''
+        with:
+          name: inserat-helfer-intern-release-${{ github.run_number }}
+          path: app/build/outputs/apk/intern/release/app-intern-release.apk

@@ -1,0 +1,151 @@
+# Inserat-Helfer intern: bauen, Signatur pruefen, zu Managed Google Play hochladen, APK als GitHub-Release ablegen.
+# Aufbau wie bei easyTDD. Ausloesen: Actions > "Run workflow" auf main (auch per API) oder Tag "v<versionName>" pushen.
+# Beim Lauf ueber "Run workflow" mit Upload auf production legt der Workflow Tag und GitHub-Release selbst an.
+# Ablauf und Regeln: docs/Veroeffentlichung.md
+name: Release intern (Managed Google Play)
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      track:
+        description: 'Play-Track: production = alle Geraete, internal = interner Test'
+        type: choice
+        default: production
+        options: [production, internal]
+      upload:
+        description: 'Zu Google Play hochladen (aus = nur bauen und pruefen)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-intern
+  cancel-in-progress: false
+
+env:
+  PACKAGE_NAME: de.olidoh.inserathelfer.intern
+  # SHA-256 des festen Signierschluessels (Alias inserathelfer, CN=Inserat-Helfer, gueltig bis 2054). NIE aendern.
+  # Weicht der Build davon ab, bricht der Workflow ab: andere Signatur = kein Update moeglich.
+  EXPECTED_CERT_SHA256: 7c7171fca33812f5cf36fb6348860532cb99267f163cf2363ef4a23b8ca6eeec
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Pflicht-Secrets pruefen
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          UPLOAD: ${{ github.event_name == 'push' || inputs.upload }}
+        run: |
+          fehlt=0
+          pflicht="SIGNING_KEYSTORE_BASE64 SIGNING_PASSWORD"
+          [ "$UPLOAD" = "true" ] && pflicht="$pflicht PLAY_SERVICE_ACCOUNT_JSON"
+          for s in $pflicht; do
+            if [ -z "${!s}" ]; then echo "::error::GitHub-Secret $s fehlt"; fehlt=1; fi
+          done
+          exit $fehlt
+
+      - name: Version lesen
+        id: ver
+        run: |
+          code=$(grep -oP '^\s*versionCode\s*=\s*\K\d+' app/build.gradle.kts | head -1)
+          name=$(grep -oP '^\s*versionName\s*=\s*"\K[^"]+' app/build.gradle.kts | head -1)
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "Version $name ($code)"
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "v$name" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME passt nicht zu versionName $name in app/build.gradle.kts"; exit 1
+          fi
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "${{ inputs.upload }}" = "true" ]; then
+            [ "$GITHUB_REF_NAME" = "main" ] || { echo "::error::Veroeffentlichen nur von main"; exit 1; }
+            if git ls-remote --exit-code --tags origin "refs/tags/v$name" >/dev/null; then
+              echo "::error::Version $name wurde bereits veroeffentlicht (Tag v$name existiert). Version erhoehen."; exit 1
+            fi
+          fi
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Signierschluessel bereitstellen
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+        run: |
+          echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/inserathelfer.jks"
+          echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/inserathelfer.jks" >> "$GITHUB_ENV"
+
+      - name: Tests und Release-APK bauen
+        env:
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :core:test :app:assembleInternRelease
+
+      - name: Paket, Version und Signatur pruefen
+        id: apk
+        run: |
+          apk=app/build/outputs/apk/intern/release/app-intern-release.apk
+          test -f "$apk" || { echo "::error::APK nicht gefunden"; exit 1; }
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$bt/apksigner" verify --print-certs "$apk" > certs.txt
+          cat certs.txt
+          # Alle Zertifikats-Fingerabdruecke (v1/v2/v3) – es darf genau einer sein.
+          digests=$(grep 'certificate SHA-256 digest' certs.txt | awk '{print $NF}' | tr 'A-F' 'a-f' | sort -u)
+          signer=$(printf '%s\n' "$digests" | grep -c .)
+          ist=$(printf '%s\n' "$digests" | head -1)
+          if [ "$signer" != "1" ] || [ "$ist" != "$EXPECTED_CERT_SHA256" ]; then
+            echo "::error::FALSCHE SIGNATUR. Erwartet $EXPECTED_CERT_SHA256, gefunden $ist ($signer Signer). Abbruch."; exit 1
+          fi
+          badging=$("$bt/aapt2" dump badging "$apk" | head -1)
+          echo "$badging"
+          echo "$badging" | grep -q "package: name='$PACKAGE_NAME'" || { echo "::error::Falscher Paketname"; exit 1; }
+          echo "$badging" | grep -q "versionCode='${{ steps.ver.outputs.code }}'" || { echo "::error::versionCode im APK passt nicht"; exit 1; }
+          ziel="Inserat-Helfer-intern-${{ steps.ver.outputs.name }}.apk"
+          cp "$apk" "$ziel"
+          echo "file=$ziel" >> "$GITHUB_OUTPUT"
+          echo "Signatur OK ($ist)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.apk.outputs.file }}
+          path: ${{ steps.apk.outputs.file }}
+          retention-days: 30
+
+      - name: Zu Google Play hochladen
+        if: github.event_name == 'push' || inputs.upload
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          pip install --quiet google-api-python-client google-auth
+          python3 tools/play_upload.py \
+            --package "$PACKAGE_NAME" \
+            --apk "${{ steps.apk.outputs.file }}" \
+            --version-code "${{ steps.ver.outputs.code }}" \
+            --release-name "${{ steps.ver.outputs.name }}" \
+            --track "${{ inputs.track || 'production' }}"
+
+      - name: GitHub-Release mit APK (fuer Geraete ohne Play Store)
+        if: github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && inputs.upload && inputs.track == 'production')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.ver.outputs.name }}" "${{ steps.apk.outputs.file }}" \
+            --target "$GITHUB_SHA" \
+            --title "Inserat-Helfer intern ${{ steps.ver.outputs.name }} (${{ steps.ver.outputs.code }})" \
+            --notes "Signatur SHA-256: $EXPECTED_CERT_SHA256 – identisch mit der Version aus Managed Google Play."
+
+      - name: Aufraeumen
+        if: always()
+        run: rm -f "$RUNNER_TEMP/inserathelfer.jks"

@@ -58,8 +58,11 @@ Pro Anfrage gehen höchstens 5 Fotos mit, auf 1568 px verkleinert.
 ## Bauen
 
 ```
-./gradlew :core:test :app:assembleDebug
+./gradlew :core:test :app:assembleStoreDebug
 ```
 
 Benötigt JDK 17 und das Android SDK (compileSdk 35). Die GitHub Action baut bei jedem Push eine
 Debug-APK und stellt sie als Artefakt bereit.
+
+Die Intune-Version (private App über Managed Google Play) wird über den Workflow *Release intern*
+veröffentlicht, siehe [docs/Veroeffentlichung.md](docs/Veroeffentlichung.md).
