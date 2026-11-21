@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Einfaches Platzhalter-Symbol: Preisschild auf grünem Grund. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#2E7D32" android:pathData="M54,4a50,50 0,1 1,0 100a50,50 0,1 1,0 -100z" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M30,34L56,34L80,58L58,80L34,56L30,34Z" />
+    <path android:fillColor="#2E7D32" android:pathData="M42,40a4,4 0,1 1,0 8a4,4 0,1 1,0 -8z" />
+</vector>
