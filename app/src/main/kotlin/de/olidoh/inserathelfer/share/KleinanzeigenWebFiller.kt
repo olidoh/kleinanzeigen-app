@@ -33,10 +33,10 @@ class KleinanzeigenWebFiller(
      * [auto] = vom Laden der Seite ausgelöst: dann nur einmal je Seite ausfüllen, damit spätere
      * Seitenereignisse (z. B. die Kategorie-Auswahl) nicht erneut alles überschreiben.
      */
-    fun fill(view: WebView, auto: Boolean = false, onResult: (String) -> Unit) {
+    fun fill(view: WebView, auto: Boolean = false, withPhotos: Boolean = true, onResult: (String) -> Unit) {
         // Fotos im Hintergrund verkleinern (Upload-Limit 12 MB je Bild, kleinere Dateien laden schneller).
         io.execute {
-            val encoded = photos.take(MAX_PHOTOS).mapNotNull { file ->
+            val encoded = photos.take(if (withPhotos) MAX_PHOTOS else 0).mapNotNull { file ->
                 runCatching { Base64.encodeToString(ImagePreparer.jpeg(file, UPLOAD_EDGE), Base64.NO_WRAP) }.getOrNull()
             }
             main.post { inject(view, encoded, auto, onResult) }
@@ -62,10 +62,16 @@ class KleinanzeigenWebFiller(
     }
 
     private fun poll(view: WebView, attempts: Int, onResult: (String) -> Unit) {
-        view.evaluateJavascript("JSON.stringify(window.__ihResult)") { raw ->
-            val result = raw?.takeIf { it != "null" && it != "\"null\"" }
+        view.evaluateJavascript("JSON.stringify({ r: window.__ihResult || null, s: window.__ihStatus || null })") { raw ->
+            val state = runCatching { JSONObject(JSONArray("[$raw]").getString(0)) }.getOrNull()
+            val result = state?.optJSONObject("r")
+            val waitingForConsent = state?.optString("s") == "consent"
             when {
-                result != null -> onResult(summary(result))
+                result != null -> onResult(summary(result.toString()))
+                waitingForConsent -> {
+                    onResult(CONSENT_HINT)
+                    main.postDelayed({ poll(view, attempts, onResult) }, 1000)
+                }
                 attempts > 60 -> onResult("Ausfüllen dauert ungewöhnlich lange. Bitte die Felder prüfen.")
                 else -> main.postDelayed({ poll(view, attempts + 1, onResult) }, 500)
             }
@@ -75,12 +81,12 @@ class KleinanzeigenWebFiller(
     /** Macht aus dem Ergebnis des Skripts eine Meldung für den Nutzer. */
     private fun summary(rawJson: String): String {
         // evaluateJavascript liefert einen JSON-String, der selbst JSON enthält.
-        val obj = runCatching { JSONObject(JSONArray("[$rawJson]").getString(0)) }.getOrNull()
+        val obj = runCatching { JSONObject(rawJson) }.getOrNull()
             ?: return "Formular ausgefüllt. Bitte prüfen und auf „Anzeige aufgeben“ tippen."
         if (obj.optBoolean("skipped")) return "Formular ist bereits ausgefüllt. Neu ausfüllen über das Zauberstab-Symbol oben."
         val missing = obj.optJSONArray("missing")?.let { arr -> List(arr.length()) { arr.getString(it) } }.orEmpty()
         return if (missing.isEmpty()) {
-            "Alles ausgefüllt. Bitte prüfen und unten auf „Anzeige aufgeben“ tippen. Ist die Seite grau, oben auf das Schloss tippen."
+            "Ausgefüllt. Bitte noch Versand wählen, alles prüfen und unten auf „Anzeige aufgeben“ tippen."
         } else {
             val categoryHint = if (missing.any { it.startsWith("Kategorie") }) {
                 "Bei Kategorie auf „Wähle deine Kategorie“ tippen, Vorschlag: ${draft.category}. "
@@ -93,6 +99,9 @@ class KleinanzeigenWebFiller(
     }
 
     companion object {
+        const val CONSENT_HINT = "Bitte zuerst unten den Cookie-Hinweis von Kleinanzeigen beantworten (einmalig). " +
+            "Danach füllt die App automatisch weiter aus."
+
         const val POST_URL = "https://www.kleinanzeigen.de/p-anzeige-aufgeben-schritt2.html"
         private const val MAX_PHOTOS = 20
         private const val UPLOAD_EDGE = 2048
@@ -123,7 +132,9 @@ class KleinanzeigenWebFiller(
                     obj != null -> {
                         val fixed = obj.optJSONArray("fixed").toStrings()
                         val report = obj.optJSONArray("report").toStrings()
-                        val summary = if (fixed.isEmpty()) {
+                        val summary = if (obj.optBoolean("consent")) {
+                            CONSENT_HINT
+                        } else if (fixed.isEmpty()) {
                             "Auf der Seite liegt nichts über dem Formular. Details über das Schloss."
                         } else {
                             "Seite freigegeben (${fixed.size} Eingriff(e)). Bitte jetzt antippen."
@@ -143,13 +154,41 @@ class KleinanzeigenWebFiller(
         fun isLogin(url: String) = url.contains("login.kleinanzeigen.de") || url.contains("m-einloggen")
 
         /**
+         * Cookie-Hinweis von Kleinanzeigen: ein per showModal() geöffnetes <dialog id="gdpr-banner">.
+         * Solange er offen ist, ist der Rest der Seite gesperrt (Taps landen auf <html>). In der WebView
+         * war er unsichtbar. Wir machen ihn sichtbar, damit der Nutzer ihn selbst beantwortet; die Wahl
+         * bleibt als Cookie in der WebView gespeichert, danach erscheint er nicht mehr.
+         */
+        private val CONSENT_HELPERS = """
+              const consentDialog = () => Array.from(document.querySelectorAll('dialog[open]')).find(dl =>
+                dl.id === 'gdpr-banner' || dl.closest('#consentBanner') ||
+                /werbung und tracking|cookie|einwillig|zustimm/.test((dl.textContent || '').toLowerCase())) || null;
+              const revealConsent = (dl) => {
+                for (let a = dl; a && a.nodeType === 1; a = a.parentElement) {
+                  if (a.hasAttribute('data-ih-hidden')) { a.style.removeProperty('display'); a.removeAttribute('data-ih-hidden'); }
+                }
+                const set = (el, k, v) => el.style.setProperty(k, v, 'important');
+                set(dl, 'position', 'fixed'); set(dl, 'left', '0'); set(dl, 'right', '0'); set(dl, 'top', 'auto'); set(dl, 'bottom', '0');
+                set(dl, 'margin', '0 auto'); set(dl, 'max-width', '100vw'); set(dl, 'max-height', Math.round(innerHeight * 0.9) + 'px');
+                set(dl, 'overflow', 'auto'); set(dl, 'display', 'block'); set(dl, 'visibility', 'visible'); set(dl, 'opacity', '1');
+                set(dl, 'z-index', '2147483647');
+                dl.querySelectorAll('*').forEach(c => {
+                  const cs = getComputedStyle(c);
+                  if (cs.maxHeight !== 'none' && parseFloat(cs.maxHeight) < 40) set(c, 'max-height', Math.round(innerHeight * 0.85) + 'px');
+                });
+              };
+        """
+
+        /**
          * Schließt offene Auswahlfenster und beseitigt alles, was Taps auf das Formular abfängt.
          * Statt zu raten, prüft das Skript per Treffer-Test (elementFromPoint), welches Element an der
          * Stelle von Titel-Feld und Absende-Knopf wirklich oben liegt, und entfernt genau das:
          * Overlays (auch iframes und Shadow-DOM), ::before/::after-Schleier, pointer-events:none,
          * inert und Abdunkeln per opacity/filter. Ergebnis: { fixed: [...], report: [...] }.
          */
-        val UNBLOCK_SCRIPT = """
+        val UNBLOCK_SCRIPT get() = UNBLOCK_TEMPLATE.replace("__CONSENT__", CONSENT_HELPERS)
+
+        private val UNBLOCK_TEMPLATE = """
             async function () {
               const sleep = (ms) => new Promise(r => setTimeout(r, ms));
               const norm = (s) => (s || '').trim().toLowerCase();
@@ -169,11 +208,20 @@ class KleinanzeigenWebFiller(
               const esc = (t) => ['keydown', 'keyup'].forEach(type => (t || document).dispatchEvent(
                 new KeyboardEvent(type, { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true })));
               report.push('Seite: ' + location.pathname + ' Fenster: ' + innerWidth + 'x' + innerHeight + ' Scroll: ' + Math.round(scrollY));
+              __CONSENT__
+              const consent = consentDialog();
+              if (consent) {
+                revealConsent(consent);
+                fixed.push('Cookie-Hinweis von Kleinanzeigen sichtbar gemacht: bitte unten beantworten');
+                report.push('Cookie-Hinweis offen (sperrt die Seite, bis er beantwortet ist)');
+                return { fixed, report, consent: true };
+              }
 
               // 1. Offene Dialoge regulär schließen
               const dialogs = () => Array.from(document.querySelectorAll('[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open]')).filter(visible);
               for (let round = 0; round < 3 && dialogs().length; round++) {
                 for (const dlg of dialogs()) {
+                  if (dlg.matches('dialog[open]') && dlg === consentDialog()) continue;
                   report.push('Dialog offen: ' + desc(dlg) + ' Text: ' + norm(dlg.textContent).slice(0, 120));
                   const buttons = Array.from(dlg.querySelectorAll('button, [role="button"]')).filter(visible);
                   const confirm = buttons.find(b => ['übernehmen', 'fertig', 'bestätigen', 'ok', 'auswählen', 'anwenden'].includes(norm(b.textContent)));
@@ -220,6 +268,7 @@ class KleinanzeigenWebFiller(
                   const x = r.left + Math.min(r.width / 2, 20), y = r.top + r.height / 2;
                   const top = document.elementFromPoint(x, y);
                   const name = probe.id || norm(probe.textContent);
+                  if (top && (top.tagName === 'DIALOG' || top.closest('dialog[open]'))) { report.push('Treffer-Test ' + name + ': offener Dialog oben, nicht entfernt'); break; }
                   if (!top || top === probe || probe.contains(top)) { report.push('Treffer-Test ' + name + ': frei'); break; }
                   report.push('Treffer-Test ' + name + ': verdeckt von ' + desc(top));
                   if (top.contains(probe)) {
@@ -229,11 +278,12 @@ class KleinanzeigenWebFiller(
                       if (pseudoOverlay(a) && !a.hasAttribute('data-ih-nopseudo')) { a.setAttribute('data-ih-nopseudo', '1'); fixed.push('Schleier (::before/::after) entfernt: ' + desc(a)); done = true; }
                     }
                     relax(probe);
-                    if (!done) { probe.style.setProperty('pointer-events', 'auto', 'important'); probe.style.setProperty('position', 'relative'); probe.style.setProperty('z-index', '2147483647'); fixed.push('Feld nach vorne geholt: ' + name); }
+                    if (!done) { report.push('Treffer-Test ' + name + ': Ursache unklar, nichts verändert'); break; }
                   } else {
                     // Fremdes Element liegt darüber: obersten Vorfahren entfernen, der das Formular nicht enthält
                     let overlay = top;
                     while (overlay.parentElement && !overlay.parentElement.contains(probe)) overlay = overlay.parentElement;
+                    if (overlay.querySelector('dialog[open]')) { report.push('Overlay enthält offenen Dialog, nicht entfernt: ' + desc(overlay)); break; }
                     hide(overlay, 'Overlay entfernt');
                   }
                   await sleep(100);
@@ -255,7 +305,7 @@ class KleinanzeigenWebFiller(
          * Läuft in der Seite. Setzt Werte so, dass das React-Formular sie übernimmt
          * (nativer Setter plus input/change-Events), und legt das Ergebnis in window.__ihResult ab.
          */
-        private val FILL_SCRIPT get() = FILL_TEMPLATE.replace("__UNBLOCK__", UNBLOCK_SCRIPT)
+        private val FILL_SCRIPT get() = FILL_TEMPLATE.replace("__CONSENT__", CONSENT_HELPERS)
 
         private val FILL_TEMPLATE = """
             async function (d) {
@@ -279,14 +329,22 @@ class KleinanzeigenWebFiller(
                 el.dispatchEvent(new PointerEvent('pointerup', o)); el.dispatchEvent(new MouseEvent('mouseup', o));
                 el.click();
               };
-              const unblock = (__UNBLOCK__);
+              __CONSENT__
+              // Nur eine offen gebliebene Auswahlliste schließen; sonst nichts an der Seite verändern.
+              const closeListbox = async () => {
+                const open = Array.from(document.querySelectorAll('[role="listbox"]')).some(l => l.getBoundingClientRect().height > 0);
+                if (!open) return;
+                const t = document.activeElement || document.body;
+                ['keydown', 'keyup'].forEach(type => t.dispatchEvent(new KeyboardEvent(type, { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true, cancelable: true })));
+                await sleep(200);
+              };
               async function pickOption(combo, label) {
                 realClick(combo);
                 const opt = await waitFor(() => Array.from(document.querySelectorAll('[role="option"]'))
                   .find(o => norm(o.textContent) === norm(label)), 3000);
                 if (opt) realClick(opt);
                 await sleep(300);
-                await unblock();
+                await closeListbox();
                 return !!opt;
               }
               // Kategorie-Vorschläge von Kleinanzeigen: passendsten anklicken (Wortüberlappung mit dem KI-Vorschlag).
@@ -313,6 +371,15 @@ class KleinanzeigenWebFiller(
                 window.__ihFilledOnce = true;
                 const form = await waitFor(() => document.getElementById('ad-title'), 10000);
                 if (!form) { window.__ihResult = { missing: ['Formular nicht gefunden (Seite geändert?)'] }; return; }
+
+                // Cookie-Hinweis zuerst: er sperrt die Seite, bis der Nutzer ihn beantwortet hat.
+                await sleep(1200);
+                if (consentDialog()) {
+                  window.__ihStatus = 'consent';
+                  for (let t = 0; t < 1800 && consentDialog(); t++) { revealConsent(consentDialog()); await sleep(1000); }
+                  window.__ihStatus = null;
+                  await sleep(800);
+                }
 
                 // Fotos
                 const fileInput = document.querySelector('input[type="file"]');
@@ -361,7 +428,7 @@ class KleinanzeigenWebFiller(
                     if (!(await pickOption(combo, d.condition))) missing.push('Zustand (' + d.condition + ')');
                   }
                 }
-                await unblock();
+                await closeListbox();
                 // Keine Kategorie: erst jetzt die Kategorie-Auswahl der Seite öffnen, damit der Nutzer direkt wählen kann.
                 if (!category) {
                   const box = document.getElementById('ad-category-suggestions');
@@ -371,7 +438,7 @@ class KleinanzeigenWebFiller(
                 }
                 window.__ihResult = { missing };
               } catch (e) {
-                try { await unblock(); } catch (_) {}
+                try { await closeListbox(); } catch (_) {}
                 window.__ihResult = { missing: ['Fehler beim Ausfüllen: ' + e.message] };
               }
             }
