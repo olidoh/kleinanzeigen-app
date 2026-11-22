@@ -18,7 +18,7 @@ class OpenAiCompatibleListingGenerator(
     private val http: OkHttpClient = defaultClient,
 ) : ListingGenerator {
 
-    override fun generate(jpegImages: List<ByteArray>, sellerNotes: String): ListingDraft {
+    override fun generate(jpegImages: List<ByteArray>, sellerNotes: String, styleGuide: String): ListingDraft {
         require(jpegImages.isNotEmpty()) { "Mindestens ein Foto wird benötigt." }
         if (config.baseUrl.isBlank()) throw ListingException("Bitte in den Einstellungen eine Basis-URL angeben.")
         if (config.model.isBlank()) throw ListingException("Bitte in den Einstellungen ein Modell angeben.")
@@ -26,7 +26,7 @@ class OpenAiCompatibleListingGenerator(
         val request = Request.Builder()
             .url(endpoint())
             .header("Authorization", "Bearer ${config.apiKey.trim()}")
-            .post(mapper.writeValueAsString(buildBody(jpegImages, sellerNotes)).toRequestBody(JSON))
+            .post(mapper.writeValueAsString(buildBody(jpegImages, sellerNotes, styleGuide)).toRequestBody(JSON))
             .build()
 
         val body = try {
@@ -62,13 +62,13 @@ class OpenAiCompatibleListingGenerator(
 
     internal fun endpoint(): String = config.baseUrl.trim().trimEnd('/') + "/chat/completions"
 
-    internal fun buildBody(jpegImages: List<ByteArray>, sellerNotes: String): Map<String, Any> {
+    internal fun buildBody(jpegImages: List<ByteArray>, sellerNotes: String, styleGuide: String = ""): Map<String, Any> {
         val userContent = buildList {
             jpegImages.take(ListingGenerator.MAX_IMAGES).forEach { bytes ->
                 val dataUrl = "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(bytes)
                 add(mapOf("type" to "image_url", "image_url" to mapOf("url" to dataUrl)))
             }
-            add(mapOf("type" to "text", "text" to ListingPrompt.userPrompt(sellerNotes)))
+            add(mapOf("type" to "text", "text" to ListingPrompt.userPrompt(sellerNotes, styleGuide)))
         }
         return mapOf(
             "model" to config.model.trim(),

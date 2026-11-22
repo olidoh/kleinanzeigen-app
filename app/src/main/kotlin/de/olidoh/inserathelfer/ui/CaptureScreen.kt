@@ -22,12 +22,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
@@ -47,15 +44,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import coil.compose.AsyncImage
 import de.olidoh.inserathelfer.ListingViewModel
 import de.olidoh.inserathelfer.Screen
 import de.olidoh.inserathelfer.image.ImagePreparer
@@ -85,6 +79,9 @@ fun CaptureScreen(vm: ListingViewModel) {
             TopAppBar(
                 title = { Text("Fotos aufnehmen") },
                 actions = {
+                    IconButton(onClick = vm::showHistory) {
+                        Icon(Icons.Filled.History, contentDescription = "Meine Anzeigen")
+                    }
                     IconButton(onClick = {
                         galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }) { Icon(Icons.Filled.PhotoLibrary, contentDescription = "Aus Galerie wählen") }
@@ -186,29 +183,5 @@ private fun CameraWithShutter(onPhoto: (java.io.File) -> Unit) {
 
 @Composable
 private fun PhotoStrip(vm: ListingViewModel) {
-    if (vm.photos.isEmpty()) return
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
-    ) {
-        items(vm.photos, key = { it.path }) { file ->
-            Box {
-                AsyncImage(
-                    model = file,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(72.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                )
-                IconButton(
-                    onClick = { vm.removePhoto(file) },
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .size(24.dp)
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.8f), CircleShape),
-                ) { Icon(Icons.Filled.Close, contentDescription = "Foto entfernen", modifier = Modifier.size(16.dp)) }
-            }
-        }
-    }
+    PhotoRow(vm, removable = true, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp))
 }

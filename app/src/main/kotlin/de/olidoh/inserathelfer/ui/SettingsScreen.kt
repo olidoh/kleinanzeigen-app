@@ -2,6 +2,7 @@ package de.olidoh.inserathelfer.ui
 
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -56,6 +57,7 @@ fun SettingsScreen(vm: ListingViewModel) {
     var model by remember(provider) { mutableStateOf(vm.settings.model(provider)) }
     var baseUrl by remember(provider) { mutableStateOf(vm.settings.baseUrl(provider)) }
     var storedKey by remember(provider) { mutableStateOf(vm.settings.apiKey(provider)) }
+    var styleInput by remember { mutableStateOf(vm.styleGuide) }
 
     val isCustom = provider == AiProvider.CUSTOM
     val canSave = (storedKey != null || keyInput.isNotBlank()) &&
@@ -160,11 +162,37 @@ fun SettingsScreen(vm: ListingViewModel) {
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Speichern und verwenden") }
 
+            HorizontalDivider()
+            Text("Stil und Tonalität", style = MaterialTheme.typography.titleMedium)
             Text(
-                "Deine Kleinanzeigen-Zugangsdaten braucht diese App nicht: Die Anzeige wird an die " +
-                    "offizielle Kleinanzeigen-App übergeben, in der du angemeldet bleibst.",
+                "Diese Vorgabe geht bei jeder Anzeige an die KI mit, egal welcher Anbieter gewählt ist.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            OutlinedTextField(
+                value = styleInput,
+                onValueChange = { styleInput = it.take(MAX_STYLE_LENGTH) },
+                label = { Text("Eigene Vorgabe (optional)") },
+                placeholder = { Text("z. B. Schreibe immer in der Du-Form, locker und freundlich. Keine Emojis.") },
+                minLines = 3,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedButton(
+                onClick = {
+                    vm.saveStyleGuide(styleInput)
+                    styleInput = vm.styleGuide
+                    Toast.makeText(context, if (vm.styleGuide.isEmpty()) "Vorgabe entfernt" else "Vorgabe gespeichert", Toast.LENGTH_SHORT).show()
+                },
+                enabled = styleInput.trim() != vm.styleGuide,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Vorgabe speichern") }
+
+            Text(
+                "Deine Kleinanzeigen-Zugangsdaten speichert diese App nicht. Du meldest dich beim Einstellen " +
+                    "direkt bei Kleinanzeigen an.",
                 style = MaterialTheme.typography.bodySmall,
             )
         }
     }
 }
+
+private const val MAX_STYLE_LENGTH = 1000

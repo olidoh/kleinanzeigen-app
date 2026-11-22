@@ -37,6 +37,11 @@ class AiSettings(context: Context) {
             .apply()
     }
 
+    /** Eigene, dauerhafte Vorgabe zu Stil und Tonalität, die bei jeder KI-Erstellung mitgeht. */
+    var styleGuide: String
+        get() = prefs.getString("style_guide", "").orEmpty()
+        set(value) = prefs.edit().putString("style_guide", value.trim()).apply()
+
     fun removeKey(provider: AiProvider) = keys.clear(provider.name)
 
     /** Konfiguration des gewählten Anbieters, oder null, wenn dafür noch kein Schlüssel hinterlegt ist. */

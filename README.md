@@ -1,4 +1,4 @@
-# Inserat-Helfer
+# Verkora
 
 Android-App, die aus ein paar Fotos eine fertige Kleinanzeige macht:
 
@@ -8,14 +8,27 @@ Android-App, die aus ein paar Fotos eine fertige Kleinanzeige macht:
 4. Alles prüfen und bearbeiten, dann „An Kleinanzeigen übergeben“: Der Text landet in der
    Zwischenablage, die Fotos gehen per Teilen an die offizielle Kleinanzeigen-App.
 
+## Stil und Tonalität
+
+In den Einstellungen lässt sich eine eigene Vorgabe hinterlegen, etwa „Schreibe immer in der Du-Form,
+keine Emojis“. Sie wird dauerhaft gespeichert und bei jeder KI-Erstellung mitgeschickt, unabhängig vom Anbieter.
+
+## Meine Anzeigen
+
+Jede erstellte Anzeige wird mit Fotos und Text auf dem Handy gespeichert (App-Speicher,
+`files/listings/<id>/`, ohne Cloud). Über das Verlauf-Symbol auf dem Kamera-Bildschirm lassen sich
+die letzten Anzeigen ansehen, weiter bearbeiten, später veröffentlichen oder löschen. Änderungen werden
+sofort gesichert. Erreicht der WebView nach dem Aufgeben die Bestätigungsseite, wird die Anzeige als
+veröffentlicht markiert; per Schalter in der Prüfansicht lässt sich das auch von Hand setzen.
+
 ## Warum Übergabe statt Automatik
 
 Kleinanzeigen bietet Privatnutzern keine Schnittstelle zum Aufgeben von Anzeigen. Automatisches
 Einloggen oder Ausfüllen verstößt gegen die Nutzungsbedingungen und bricht bei jedem Update.
 Die App fasst deshalb den Kleinanzeigen-Login nicht an: Du bleibst in der offiziellen App angemeldet.
 
-Nimmt die Kleinanzeigen-App keine geteilten Fotos an, legt der Inserat-Helfer sie unter
-`Bilder/Inserat-Helfer` in die Galerie und öffnet die Kleinanzeigen-App.
+Nimmt die Kleinanzeigen-App keine geteilten Fotos an, legt Verkora sie unter
+`Bilder/Verkora` in die Galerie und öffnet die Kleinanzeigen-App.
 
 ## KI-Anbieter und Schlüssel
 
@@ -45,8 +58,11 @@ Pro Anfrage gehen höchstens 5 Fotos mit, auf 1568 px verkleinert.
 ## Bauen
 
 ```
-./gradlew :core:test :app:assembleDebug
+./gradlew :core:test :app:assembleStoreDebug
 ```
 
 Benötigt JDK 17 und das Android SDK (compileSdk 35). Die GitHub Action baut bei jedem Push eine
 Debug-APK und stellt sie als Artefakt bereit.
+
+Die Intune-Version (private App über Managed Google Play) wird über den Workflow *Release intern*
+veröffentlicht, siehe [docs/Veroeffentlichung.md](docs/Veroeffentlichung.md).
