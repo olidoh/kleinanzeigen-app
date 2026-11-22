@@ -14,6 +14,12 @@ if (releaseRequested && sharedKeystore == null) {
     throw GradleException("Release-Build ohne Signierschlüssel: SIGNING_KEYSTORE_PATH und SIGNING_PASSWORD setzen.")
 }
 
+// eBay-Anbindung: nicht geheime Werte aus GitHub-Variablen (oder local gradle.properties). Das Secret liegt
+// nur im Token-Dienst, nie in der App. Siehe docs/eBay-Einrichtung.md.
+fun ebayValue(name: String): String =
+    (System.getenv(name) ?: providers.gradleProperty(name).orNull).orEmpty().trim()
+fun quoted(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
 android {
     // Interner Code-Namensraum (nicht sichtbar), bleibt aus der Zeit als „Inserat-Helfer“.
     namespace = "de.olidoh.inserathelfer"
@@ -28,6 +34,11 @@ android {
         // Google Play lehnt gleiche oder kleinere Nummern ab. Debug-Builds zählen stattdessen pro CI-Lauf hoch (unten).
         versionCode = 100
         versionName = "1.0.0"
+
+        buildConfigField("String", "EBAY_CLIENT_ID", quoted(ebayValue("EBAY_CLIENT_ID")))
+        buildConfigField("String", "EBAY_RUNAME", quoted(ebayValue("EBAY_RUNAME")))
+        buildConfigField("String", "EBAY_TOKEN_SERVICE_URL", quoted(ebayValue("EBAY_TOKEN_SERVICE_URL")))
+        buildConfigField("boolean", "EBAY_SANDBOX", (ebayValue("EBAY_SANDBOX") == "true").toString())
     }
 
     // Vertriebswege: "intern" für die private App über Intune (Managed Google Play),
@@ -71,7 +82,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 
     packaging {
         resources {

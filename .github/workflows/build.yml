@@ -29,6 +29,11 @@ jobs:
       - name: Tests und Debug-APK bauen
         env:
           SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+          # eBay-Anbindung (nicht geheim, unter Settings > Secrets and variables > Actions > Variables)
+          EBAY_CLIENT_ID: ${{ vars.EBAY_CLIENT_ID }}
+          EBAY_RUNAME: ${{ vars.EBAY_RUNAME }}
+          EBAY_TOKEN_SERVICE_URL: ${{ vars.EBAY_TOKEN_SERVICE_URL }}
+          EBAY_SANDBOX: ${{ vars.EBAY_SANDBOX }}
         run: ./gradlew --no-daemon :core:test :app:assembleStoreDebug
       - uses: actions/upload-artifact@v7
         with:

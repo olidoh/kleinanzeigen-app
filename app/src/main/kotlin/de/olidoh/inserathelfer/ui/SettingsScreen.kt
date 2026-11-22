@@ -186,6 +186,8 @@ fun SettingsScreen(vm: ListingViewModel) {
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Vorgabe speichern") }
 
+            EbaySection(vm)
+
             Text(
                 "Deine Kleinanzeigen-Zugangsdaten speichert diese App nicht. Du meldest dich beim Einstellen " +
                     "direkt bei Kleinanzeigen an.",
@@ -196,3 +198,82 @@ fun SettingsScreen(vm: ListingViewModel) {
 }
 
 private const val MAX_STYLE_LENGTH = 1000
+
+@Composable
+private fun EbaySection(vm: ListingViewModel) {
+    val context = LocalContext.current
+    val flow = vm.ebay
+    val settings = flow.settings
+    var advanced by remember { mutableStateOf(!settings.hasBuiltInConfig) }
+    var clientId by remember { mutableStateOf(settings.customClientId) }
+    var ruName by remember { mutableStateOf(settings.customRuName) }
+    var serviceUrl by remember { mutableStateOf(settings.customServiceUrl) }
+    var sandbox by remember { mutableStateOf(settings.customSandbox) }
+
+    HorizontalDivider()
+    Text("eBay", style = MaterialTheme.typography.titleMedium)
+    Text(
+        "Zum Einstellen bei eBay meldest du dich einmal mit deinem eBay-Konto an. Dein Passwort geht nur an eBay; " +
+            "die App speichert nur den Zugang, verschlüsselt auf diesem Gerät.",
+        style = MaterialTheme.typography.bodySmall,
+    )
+    when {
+        !flow.isConfigured -> Text(
+            "eBay ist noch nicht eingerichtet. Das ist optional: Kleinanzeigen funktioniert auch ohne. " +
+                "Zum Einrichten unten die Daten der eBay-Anwendung eintragen (Anleitung: docs/eBay-Einrichtung.md im Repo).",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        flow.loggedIn -> {
+            Text(
+                if (flow.accountName.isNotBlank()) "Angemeldet als ${flow.accountName}." else "Bei eBay angemeldet.",
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = {
+                    flow.logout()
+                    vm.openEbayLogin(Screen.SETTINGS)
+                }) { Text("Anderes Konto") }
+                OutlinedButton(onClick = flow::logout) { Text("Abmelden") }
+            }
+        }
+        else -> Button(onClick = { vm.openEbayLogin(Screen.SETTINGS) }) { Text("Bei eBay anmelden") }
+    }
+    TextButton(onClick = { advanced = !advanced }) {
+        Text(if (advanced) "Erweiterte eBay-Einstellungen ausblenden" else "Erweiterte eBay-Einstellungen")
+    }
+    if (advanced) {
+        Text(
+            "Nur nötig, wenn diese App-Version ohne eBay-Daten gebaut wurde oder du eine eigene eBay-Anwendung " +
+                "nutzt. Leere Felder nehmen die eingebauten Werte.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        OutlinedTextField(clientId, { clientId = it }, label = { Text("App ID (Client ID)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(ruName, { ruName = it }, label = { Text("RuName") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(
+            serviceUrl, { serviceUrl = it },
+            label = { Text("Adresse des Token-Dienstes") },
+            placeholder = { Text("https://…workers.dev") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("eBay-Sandbox (Testumgebung)", modifier = Modifier.weight(1f))
+            androidx.compose.material3.Switch(checked = sandbox, onCheckedChange = { sandbox = it })
+        }
+        OutlinedButton(onClick = {
+            val changed = settings.customSandbox != sandbox || settings.customClientId != clientId.trim()
+            settings.customClientId = clientId
+            settings.customRuName = ruName
+            settings.customServiceUrl = serviceUrl
+            settings.customSandbox = sandbox
+            // Ein Zugang gilt nur für die eBay-Anwendung und Umgebung, mit der er erstellt wurde.
+            if (changed) flow.logout()
+            flow.reloadConfig()
+            Toast.makeText(
+                context,
+                if (flow.isConfigured) "eBay-Einstellungen gespeichert" else "Gespeichert, aber noch unvollständig",
+                Toast.LENGTH_SHORT,
+            ).show()
+        }) { Text("eBay-Einstellungen speichern") }
+    }
+}

@@ -12,10 +12,16 @@ data class SavedListing(
     val draft: ListingDraft,
     val photos: List<File>,
     val sellerNotes: String = "",
+    /** Zeitpunkt der Veröffentlichung bei Kleinanzeigen. */
     val publishedAt: Long? = null,
+    /** Angebot bei eBay, falls die Anzeige dort eingestellt wurde. */
+    val ebay: EbayPublication? = null,
 ) {
     val isPublished: Boolean get() = publishedAt != null
 }
+
+/** Ein bei eBay veröffentlichtes Angebot dieser Anzeige. */
+data class EbayPublication(val listingId: String, val url: String, val publishedAt: Long)
 
 /**
  * Legt Anzeigen dauerhaft auf dem Gerät ab: je Anzeige ein Ordner mit `listing.json` und den Fotos.
@@ -68,6 +74,13 @@ class ListingStore(private val root: File, private val clock: () -> Long = Syste
             put("createdAt", listing.createdAt)
             listing.publishedAt?.let { put("publishedAt", it) }
             put("sellerNotes", listing.sellerNotes)
+            listing.ebay?.let { e ->
+                putObject("ebay").apply {
+                    put("listingId", e.listingId)
+                    put("url", e.url)
+                    put("publishedAt", e.publishedAt)
+                }
+            }
             putArray("photos").apply { listing.photos.forEach { add(it.name) } }
             putObject("draft").apply {
                 put("title", d.title)
@@ -97,6 +110,9 @@ class ListingStore(private val root: File, private val clock: () -> Long = Syste
             createdAt = json.get("createdAt").asLong(),
             publishedAt = json.get("publishedAt")?.takeIf { !it.isNull }?.asLong(),
             sellerNotes = json.path("sellerNotes").asText(""),
+            ebay = json.get("ebay")?.takeIf { it.isObject && it.path("listingId").asText("").isNotBlank() }?.let {
+                EbayPublication(it.path("listingId").asText(), it.path("url").asText(""), it.path("publishedAt").asLong(0))
+            },
             photos = json.path("photos").map { File(photoDir, File(it.asText()).name) }.filter(File::isFile),
             draft = ListingDraft(
                 title = d.path("title").asText(""),

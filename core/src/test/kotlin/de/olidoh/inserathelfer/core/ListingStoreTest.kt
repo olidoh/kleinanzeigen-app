@@ -67,4 +67,14 @@ class ListingStoreTest {
         store.update(saved)
         assertFalse(File(root, saved.id).exists())
     }
+
+    @Test
+    fun `merkt sich das eBay-Angebot`() {
+        val store = ListingStore(File(tmp, "store"))
+        val saved = store.create(draft, emptyList())
+        assertNull(saved.ebay)
+        store.update(saved.copy(ebay = EbayPublication("123", "https://www.ebay.de/itm/123", 7L)))
+        assertEquals(EbayPublication("123", "https://www.ebay.de/itm/123", 7L), store.get(saved.id)!!.ebay)
+        assertFalse(store.get(saved.id)!!.isPublished)
+    }
 }

@@ -1,0 +1,18 @@
+# Cloudflare Worker für die eBay-Anmeldung von Verkora.
+# Einrichtung: docs/eBay-Einrichtung.md
+name = "verkora-ebay"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+
+[vars]
+# Nicht geheim. Werte aus dem eBay-Entwicklerportal eintragen (siehe Anleitung).
+EBAY_CLIENT_ID = ""
+EBAY_RUNAME = ""
+# Optional für Tests mit der eBay-Sandbox:
+EBAY_SANDBOX_CLIENT_ID = ""
+EBAY_SANDBOX_RUNAME = ""
+
+# Geheim, NICHT hier eintragen, sondern per Befehl:
+#   npx wrangler secret put EBAY_CLIENT_SECRET
+#   npx wrangler secret put EBAY_VERIFICATION_TOKEN
+#   (optional) npx wrangler secret put EBAY_SANDBOX_CLIENT_SECRET
