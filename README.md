@@ -1,4 +1,4 @@
-# Inserat-Helfer
+# Verkora
 
 Android-App, die aus ein paar Fotos eine fertige Kleinanzeige macht:
 
@@ -36,8 +36,8 @@ Kleinanzeigen bietet Privatnutzern keine Schnittstelle zum Aufgeben von Anzeigen
 Einloggen oder Ausfüllen verstößt gegen die Nutzungsbedingungen und bricht bei jedem Update.
 Die App fasst deshalb den Kleinanzeigen-Login nicht an: Du bleibst in der offiziellen App angemeldet.
 
-Nimmt die Kleinanzeigen-App keine geteilten Fotos an, legt der Inserat-Helfer sie unter
-`Bilder/Inserat-Helfer` in die Galerie und öffnet die Kleinanzeigen-App.
+Nimmt die Kleinanzeigen-App keine geteilten Fotos an, legt Verkora sie unter
+`Bilder/Verkora` in die Galerie und öffnet die Kleinanzeigen-App.
 
 ## KI-Anbieter und Schlüssel
 
@@ -67,8 +67,11 @@ Pro Anfrage gehen höchstens 5 Fotos mit, auf 1568 px verkleinert.
 ## Bauen
 
 ```
-./gradlew :core:test :app:assembleDebug
+./gradlew :core:test :app:assembleStoreDebug
 ```
 
 Benötigt JDK 17 und das Android SDK (compileSdk 35). Die GitHub Action baut bei jedem Push eine
 Debug-APK und stellt sie als Artefakt bereit.
+
+Die Intune-Version (private App über Managed Google Play) wird über den Workflow *Release intern*
+veröffentlicht, siehe [docs/Veroeffentlichung.md](docs/Veroeffentlichung.md).

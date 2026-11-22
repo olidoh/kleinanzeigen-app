@@ -8,6 +8,11 @@ plugins {
 val signingPassword: String? = System.getenv("SIGNING_PASSWORD")?.takeIf { it.isNotBlank() }
 val sharedKeystore = System.getenv("SIGNING_KEYSTORE_PATH")?.let { file(it) }?.takeIf { it.isFile && signingPassword != null }
 val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+// Release-Builds (Intune) brauchen zwingend den festen Schlüssel, sonst lässt sich die App nie wieder aktualisieren.
+val releaseRequested = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
+if (releaseRequested && sharedKeystore == null) {
+    throw GradleException("Release-Build ohne Signierschlüssel: SIGNING_KEYSTORE_PATH und SIGNING_PASSWORD setzen.")
+}
 
 // eBay-Anbindung: nicht geheime Werte aus GitHub-Variablen (oder local gradle.properties). Das Secret liegt
 // nur im Token-Dienst, nie in der App. Siehe docs/eBay-Einrichtung.md.
@@ -16,22 +21,37 @@ fun ebayValue(name: String): String =
 fun quoted(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
 android {
+    // Interner Code-Namensraum (nicht sichtbar), bleibt aus der Zeit als „Inserat-Helfer“.
     namespace = "de.olidoh.inserathelfer"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "de.olidoh.inserathelfer"
+        applicationId = "de.olidoh.verkora"
         // Android 10+: Fotos lassen sich ohne Speicher-Berechtigung in die Galerie legen.
         minSdk = 29
         targetSdk = 36
-        // Jeder CI-Lauf zählt hoch, damit Android die neue APK als Update annimmt.
-        versionCode = buildNumber
-        versionName = "0.1.$buildNumber"
+        // Version der Veröffentlichung (Intune / Managed Google Play). Nur über tools/version_erhoehen.py ändern;
+        // Google Play lehnt gleiche oder kleinere Nummern ab. Debug-Builds zählen stattdessen pro CI-Lauf hoch (unten).
+        versionCode = 100
+        versionName = "1.0.0"
 
         buildConfigField("String", "EBAY_CLIENT_ID", quoted(ebayValue("EBAY_CLIENT_ID")))
         buildConfigField("String", "EBAY_RUNAME", quoted(ebayValue("EBAY_RUNAME")))
         buildConfigField("String", "EBAY_TOKEN_SERVICE_URL", quoted(ebayValue("EBAY_TOKEN_SERVICE_URL")))
         buildConfigField("boolean", "EBAY_SANDBOX", (ebayValue("EBAY_SANDBOX") == "true").toString())
+    }
+
+    // Vertriebswege: "intern" für die private App über Intune (Managed Google Play),
+    // "store" für die bisherigen Test-APKs und eine spätere öffentliche Veröffentlichung.
+    flavorDimensions += "vertrieb"
+    productFlavors {
+        create("intern") {
+            dimension = "vertrieb"
+            applicationIdSuffix = ".intern"
+        }
+        create("store") {
+            dimension = "vertrieb"
+        }
     }
 
     signingConfigs {
@@ -50,6 +70,7 @@ android {
             if (sharedKeystore != null) signingConfig = signingConfigs.getByName("shared")
         }
         release {
+            if (sharedKeystore != null) signingConfig = signingConfigs.getByName("shared")
             // Das Anthropic-SDK nutzt Reflection (Jackson); Minify erst mit passenden Regeln aktivieren.
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
@@ -76,6 +97,16 @@ android {
                 "META-INF/INDEX.LIST",
                 "META-INF/versions/9/OSGI-INF/MANIFEST.MF",
             )
+        }
+    }
+}
+
+// Test-APKs aus der CI zählen pro Lauf hoch, damit sie sich drüber installieren lassen.
+androidComponents {
+    onVariants(selector().withBuildType("debug")) { variant ->
+        variant.outputs.forEach {
+            it.versionCode.set(buildNumber)
+            it.versionName.set("0.1.$buildNumber")
         }
     }
 }

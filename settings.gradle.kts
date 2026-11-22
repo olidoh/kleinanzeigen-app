@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "inserat-helfer"
+rootProject.name = "verkora"
 include(":core", ":app")

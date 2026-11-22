@@ -67,12 +67,12 @@ object KleinanzeigenHandoff {
         return Result.APP_NOT_INSTALLED
     }
 
-    /** Legt ein Foto unter Bilder/Inserat-Helfer ab, damit es in jeder Bildauswahl erscheint. */
+    /** Legt ein Foto unter Bilder/Verkora ab, damit es in jeder Bildauswahl erscheint. */
     fun saveToGallery(context: Context, photo: File): Uri? {
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, photo.name)
             put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-            put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/Inserat-Helfer")
+            put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/Verkora")
             put(MediaStore.Images.Media.IS_PENDING, 1)
         }
         val resolver = context.contentResolver
