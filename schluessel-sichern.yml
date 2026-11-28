@@ -1,11 +1,11 @@
-# EINMALIG: holt den Verkora-Signierschluessel aus dem GitHub-Secret als Download.
-# Laeuft nur, wenn das Repo privat ist. Nach dem Herunterladen: Lauf loeschen, diese Datei loeschen.
+# EINMALIG: holt den Verkora-Signierschluessel aus dem GitHub-Secret als Entwurfs-Release (zaehlt nicht gegen den Artefakt-Speicher).
+# Laeuft nur, wenn das Repo privat ist. Nach dem Herunterladen: Entwurf loeschen, Lauf loeschen, diese Datei loeschen.
 name: Schluessel sichern (einmalig)
 
 on: workflow_dispatch
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   sichern:
@@ -36,8 +36,11 @@ jobs:
           fi
           echo "Fingerabdruck OK - das ist der Verkora-Schluessel."
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: verkora-release-keystore
-          path: sicherung/verkora-release.jks
-          retention-days: 1
+      - name: Als Entwurfs-Release ablegen (nur fuer dich sichtbar)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create schluessel-sicherung sicherung/verkora-release.jks \
+            --repo "$GITHUB_REPOSITORY" --draft \
+            --title "Schluessel-Sicherung - nach Download sofort loeschen" \
+            --notes "verkora-release.jks herunterladen, nach HiDrive\\Sync\\Schluessel\\verkora legen, dann diesen Entwurf loeschen."
