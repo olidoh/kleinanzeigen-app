@@ -14,7 +14,7 @@ jobs:
       - name: Anmelden und Tracks lesen (veroeffentlicht nichts)
         env:
           PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          PACKAGE_NAME: de.fruehfunke.app
+          PACKAGE_NAME: de.olidoh.verkora.intern
         run: |
           test -n "$PLAY_SERVICE_ACCOUNT_JSON" || { echo "::error::Secret PLAY_SERVICE_ACCOUNT_JSON fehlt"; exit 1; }
           pip install --quiet google-api-python-client google-auth
