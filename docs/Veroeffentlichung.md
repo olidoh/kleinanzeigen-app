@@ -19,11 +19,11 @@ Die Anzeigen-Historie und die KI-Schlüssel der Test-APK werden nicht übernomme
 | Was | Wert |
 |---|---|
 | Paketname | `de.olidoh.verkora.intern` (Variante `intern`) |
-| Signierschlüssel | Alias `inserathelfer`, CN=Inserat-Helfer, gültig bis 2054 (GitHub-Secrets; Sicherung gehört nach `HiDrive\Sync\Schluessel\verkora`) |
+| Signierschlüssel | Alias `inserathelfer`, CN=Inserat-Helfer, gültig bis 2054 (GitHub-Secrets; Sicherung: `HiDrive\Sync\Schluessel\verkora\verkora-release.jks`) |
 | Zertifikat SHA-256 | `7C:71:71:FC:A3:38:12:F5:CF:36:FB:63:48:86:05:32:CB:99:26:7F:16:3C:F2:36:3E:F4:A2:3B:8C:A6:EE:EC` |
 | Play App Signing | **nicht einschalten** – sonst passen Play-Version und Direkt-APK nicht mehr zusammen |
 | Quellcode lokal | `HiDrive\Sync\Android\verkora` (Git-Klon von olidoh/kleinanzeigen-app) |
-| Dienstkonto-JSON | `HiDrive\Sync\Schluessel\verkora\verkora-publish-….json` (Inhalt als GitHub-Secret) |
+| Dienstkonto-JSON | `HiDrive\Sync\Schluessel\verkora\verkora-publish.json` (Inhalt als GitHub-Secret) |
 
 Das Repo ist öffentlich: Keystore, Passwort und Dienstkonto-JSON **nie** ins Repo legen.
 
