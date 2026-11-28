@@ -1,0 +1,39 @@
+# Prueft nur den Zugang zu Google Play mit dem Secret PLAY_SERVICE_ACCOUNT_JSON.
+# Meldet sich an, liest die Tracks und verwirft den Vorgang - es wird NICHTS hochgeladen oder veroeffentlicht.
+name: Play-Zugang pruefen
+
+on: workflow_dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Anmelden und Tracks lesen (veroeffentlicht nichts)
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          PACKAGE_NAME: de.fruehfunke.app
+        run: |
+          test -n "$PLAY_SERVICE_ACCOUNT_JSON" || { echo "::error::Secret PLAY_SERVICE_ACCOUNT_JSON fehlt"; exit 1; }
+          pip install --quiet google-api-python-client google-auth
+          python3 - <<'PY'
+          import json, os
+          from google.oauth2 import service_account
+          from googleapiclient.discovery import build
+          info = json.loads(os.environ["PLAY_SERVICE_ACCOUNT_JSON"])
+          print("Dienstkonto:", info.get("client_email"), "| Schluessel-ID beginnt mit:", info.get("private_key_id", "")[:12])
+          creds = service_account.Credentials.from_service_account_info(
+              info, scopes=["https://www.googleapis.com/auth/androidpublisher"])
+          edits = build("androidpublisher", "v3", credentials=creds, cache_discovery=False).edits()
+          pkg = os.environ["PACKAGE_NAME"]
+          eid = edits.insert(packageName=pkg, body={}).execute()["id"]
+          try:
+              for t in edits.tracks().list(packageName=pkg, editId=eid).execute().get("tracks", []):
+                  for r in t.get("releases", []):
+                      print(f"Track {t['track']}: {r.get('name')} {r.get('versionCodes')} ({r.get('status')})")
+          finally:
+              edits.delete(packageName=pkg, editId=eid).execute()
+          print("Zugang OK - nichts veroeffentlicht.")
+          PY
